@@ -1,0 +1,10 @@
+name: snmp
+version: 1.0.0
+
+dependencies:
+  bindata:
+    github: spider-gazelle/bindata
+
+development_dependencies:
+  ameba:
+    github: veelenga/ameba
