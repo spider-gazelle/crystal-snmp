@@ -10,6 +10,10 @@ describe SNMP do
     snmp.request.should eq(SNMP::Request::V1_Trap)
     snmp.community.should eq("5rNTg!pm1ck")
 
+    snmp.varbinds.map(&.oid).should eq(["1.3.6.1.2.1.2.2.1.1.26", "1.3.6.1.2.1.2.2.1.2.26", "1.3.6.1.2.1.2.2.1.3.26", "1.3.6.1.4.1.9.2.2.1.1.20.26"])
+    snmp.expects_response?.should eq(false)
+    snmp.trap?.should eq(true)
+
     snmp_pdu = snmp.pdu
     if snmp_pdu.is_a?(SNMP::TrapPDU)
       snmp_pdu.oid.should eq("1.3.6.1.6.3.1.1.5")

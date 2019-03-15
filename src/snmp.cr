@@ -66,9 +66,9 @@ class SNMP
     if @version == Version::V3
       raise "not supported"
     elsif @version == Version::V1 && @request == Request::V1_Trap
-      @pdu = TrapPDU.new(snmp[2].children)
+      @pdu = TrapPDU.new(snmp[2])
     else
-      @pdu = PDU.new(snmp[2].children)
+      @pdu = PDU.new(snmp[2])
     end
   end
 

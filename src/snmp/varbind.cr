@@ -1,6 +1,7 @@
 class SNMP
   class VarBind
-    def initialize(varbind : Array(ASN1::BER))
+    def initialize(ber : ASN1::BER)
+      varbind = ber.children
       @oid = varbind[0].get_object_id
       @value = varbind[1]
     end
