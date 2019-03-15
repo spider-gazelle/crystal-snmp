@@ -17,11 +17,7 @@ class SNMP
 
     def varbinds
       @varbinds.map do |varbind|
-        children = varbind.children
-        {
-          oid: children[0].get_object_id,
-          value: children[1]
-        }
+        VarBind.new(varbind.children)
       end
     end
   end

@@ -99,4 +99,5 @@ class SNMP
 end
 
 require "./snmp/pdu"
+require "./snmp/varbind"
 require "./snmp/v1_trap"
