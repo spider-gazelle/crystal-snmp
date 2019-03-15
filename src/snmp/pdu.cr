@@ -15,10 +15,16 @@ class SNMP
     property error_status : ErrorStatus
     property error_index : Int32
     @varbinds : Array(ASN1::BER)
+    @lazy_varbinds : Array(VarBind)?
 
     def varbinds
-      @varbinds.map do |varbind|
-        VarBind.new(varbind.children)
+      if vb = @lazy_varbinds
+        vb
+      else
+        @lazy_varbinds = vb = @varbinds.map do |varbind|
+          VarBind.new(varbind.children)
+        end
+        vb
       end
     end
   end

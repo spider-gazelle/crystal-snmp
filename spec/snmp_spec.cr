@@ -16,6 +16,8 @@ describe SNMP do
       snmp_pdu.agent_address.should eq("10.230.254.28")
       snmp_pdu.generic_trap.should eq(SNMP::GenericTrap::LinkUp)
       snmp_pdu.specific_trap.should eq(0)
+
+      snmp_pdu.varbinds.map(&.oid).should eq(["1.3.6.1.2.1.2.2.1.1.26", "1.3.6.1.2.1.2.2.1.2.26", "1.3.6.1.2.1.2.2.1.3.26", "1.3.6.1.4.1.9.2.2.1.1.20.26"])
     else
       raise "should be a v1 trap pdu"
     end
