@@ -36,7 +36,20 @@ class SNMP
     NoSuchName
     BadValue
     ReadOnly
-    GenErr
+    GeneralError
+    AccessDenied
+    WrongType
+    WrongLength
+    WrongEncoding
+    WrongValue
+    NoCreation
+    InconsistentValue
+    ResourceUnavailable
+    CommitFailed
+    UndoFailed
+    AuthorizationError
+    NotWritable
+    InconsistentName
   end
 
   # Custom SNMP tags on varbinds
@@ -96,33 +109,29 @@ class SNMP
     end
   {% end %}
 
+  # Returns true if the current packet is a trap / inform
   def trap?
     {Request::V1_Trap, Request::V2_Trap, Request::Inform}.includes? @request
   end
 
+  # Returns true if the current SNMP packet is expecting a response
   def expects_response?
     {Request::GetRequest, Request::GetNext, Request::SetRequest, Request::GetBulk, Request::Inform}.includes? @request
   end
 
+  # Builds a response object based on the current request
   def build_reply
     self.class.new(@version, @community, Request::Response, @pdu.request_id)
   end
 
-  # IO serialisatio support
+  # IO serialisation support
   def self.from_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
     SNMP.new(io.read_bytes(ASN1::BER))
   end
 
   def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
-    # version
-    ver = ASN1::BER.new
-    ver.set_integer(@version.to_i)
-
-    # community
-    com = ASN1::BER.new
-    com.set_string(@community, ASN1::BER::UniversalTags::OctetString)
-
-    # build pdu
+    ver = ASN1::BER.new.set_integer(@version.to_i)
+    com = ASN1::BER.new.set_string(@community, ASN1::BER::UniversalTags::OctetString)
     pdu = @pdu.to_ber(@request.to_u8)
 
     # write SNMP sequence
