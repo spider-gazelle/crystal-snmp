@@ -65,10 +65,15 @@ class SNMP
 
     if @version == Version::V3
       raise "not supported"
-    elsif @version == Version::V1 && @request == Request::V1_Trap
-      @pdu = TrapPDU.new(snmp[2])
+    elsif @request == Request::V1_Trap
+      @pdu = V1Trap.new(snmp[2])
     else
-      @pdu = PDU.new(snmp[2])
+      case @request
+      when Request::V2_Trap
+        @pdu = Trap.new(snmp[2])
+      else
+        @pdu = PDU.new(snmp[2])
+      end
     end
   end
 
@@ -76,14 +81,20 @@ class SNMP
     @pdu = PDU.new(request_id, error_status, error_index)
   end
 
-  getter pdu : PDU | TrapPDU
+  getter pdu : PDU | Trap | V1Trap
   property version : Version
   property request : Request
   property community : String
 
-  def varbinds
-    @pdu.varbinds
-  end
+  {% for proxy in [:varbinds, :request_id, :error_index, :error_status] %}
+    def {{proxy.id}}
+      @pdu.{{proxy.id}}
+    end
+
+    def {{proxy.id}}=(value)
+      @pdu.{{proxy.id}} = value
+    end
+  {% end %}
 
   def trap?
     {Request::V1_Trap, Request::V2_Trap, Request::Inform}.includes? @request
@@ -96,8 +107,34 @@ class SNMP
   def build_reply
     self.class.new(@version, @community, Request::Response, @pdu.request_id)
   end
+
+  # IO serialisatio support
+  def self.from_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
+    SNMP.new(io.read_bytes(ASN1::BER))
+  end
+
+  def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
+    # version
+    ver = ASN1::BER.new
+    ver.set_integer(@version.to_i)
+
+    # community
+    com = ASN1::BER.new
+    com.set_string(@community, ASN1::BER::UniversalTags::OctetString)
+
+    # build pdu
+    pdu = @pdu.to_ber(@request.to_u8)
+
+    # write SNMP sequence
+    snmp = ASN1::BER.new
+    snmp.tag_number = ASN1::BER::UniversalTags::Sequence
+    snmp.children = {ver, com, pdu}
+    snmp.write(io)
+  end
 end
 
 require "./snmp/pdu"
-require "./snmp/varbind"
+require "./snmp/trap"
 require "./snmp/v1_trap"
+require "./snmp/varbind"
+require "./snmp/data_types"

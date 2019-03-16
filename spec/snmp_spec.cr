@@ -15,15 +15,35 @@ describe SNMP do
     snmp.trap?.should eq(true)
 
     snmp_pdu = snmp.pdu
-    if snmp_pdu.is_a?(SNMP::TrapPDU)
+    if snmp_pdu.is_a?(SNMP::V1Trap)
       snmp_pdu.oid.should eq("1.3.6.1.6.3.1.1.5")
       snmp_pdu.agent_address.should eq("10.230.254.28")
       snmp_pdu.generic_trap.should eq(SNMP::GenericTrap::LinkUp)
       snmp_pdu.specific_trap.should eq(0)
+      snmp_pdu.time_ticks.should eq(245549128)
 
       snmp_pdu.varbinds.map(&.oid).should eq(["1.3.6.1.2.1.2.2.1.1.26", "1.3.6.1.2.1.2.2.1.2.26", "1.3.6.1.2.1.2.2.1.3.26", "1.3.6.1.4.1.9.2.2.1.1.20.26"])
     else
       raise "should be a v1 trap pdu"
     end
+  end
+
+  it "should be able to write a SNMP V1 responses" do
+    b = Bytes[0x30, 0x38, 0x02, 0x01, 0x00, 0x04, 0x06,
+      0x70, 0x75, 0x62, 0x6c, 0x69, 0x63, 0xa2, 0x2b, 0x02, 0x01, 0x26, 0x02,
+      0x01, 0x00, 0x02, 0x01, 0x00, 0x30, 0x20, 0x30, 0x1e, 0x06, 0x08, 0x2b,
+      0x06, 0x01, 0x02, 0x01, 0x01, 0x02, 0x00, 0x06, 0x12, 0x2b, 0x06, 0x01,
+      0x04, 0x01, 0x8f, 0x51, 0x01, 0x01, 0x01, 0x82, 0x29, 0x5d, 0x01, 0x1b,
+      0x02, 0x02, 0x01]
+    io = IO::Memory.new(b)
+
+    snmp = SNMP.new(io.read_bytes(ASN1::BER))
+    snmp.version.should eq(SNMP::Version::V1)
+    snmp.community.should eq("public")
+
+    io2 = IO::Memory.new
+    io2.write_bytes snmp
+
+    io2.to_slice.should eq(b)
   end
 end
