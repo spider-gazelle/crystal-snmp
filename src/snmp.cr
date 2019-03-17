@@ -5,7 +5,7 @@ class SNMP
   enum Version
     V1
     V2C
-    V3 = 3
+    V3  = 3
   end
 
   enum Request
@@ -147,3 +147,4 @@ require "./snmp/trap"
 require "./snmp/v1_trap"
 require "./snmp/varbind"
 require "./snmp/data_types"
+require "./snmp/v3/security"
