@@ -1,4 +1,5 @@
 require "openssl"
+require "./encryption/*"
 
 # Based on: https://github.com/swisscom/ruby-netsnmp/blob/master/lib/netsnmp/security_parameters.rb
 
@@ -79,6 +80,31 @@ class SNMP
     def engine_id=(id)
       @timeliness = Time.monotonic.to_i
       @engine_id = id
+    end
+
+    def encode(pdu : ASN1::BER, salt : ASN1::BER, engine_time, engine_boots)
+      if crypt = encryption
+        io = IO::Memory.new
+        io.write_bytes pdu
+
+        encrypted_pdu, salt = crypt.encrypt(io.to_slice, engine_boots: engine_boots, engine_time: engine_time)
+        pdu = ASN1::BER.new.set_string(encrypted_pdu, UniversalTags::OctetString)
+        salt = ASN1::BER.new.set_string(salt, UniversalTags::OctetString)
+
+        {pdu, salt}
+      else
+        {pdu, salt}
+      end
+    end
+
+    def decode(der : ASN1::BER, salt : ASN1::BER, engine_time, engine_boots)
+      if crypt = encryption
+        encrypted_pdu = der.get_bytes
+        pdu_der = crypt.decrypt(encrypted_pdu, salt: salt.get_bytes, engine_time: engine_time, engine_boots: engine_boots)
+        pdu_der.read_bytes(ASN1::BER)
+      else
+        der
+      end
     end
 
     def sign(message)
@@ -168,6 +194,15 @@ class SNMP
       dig = @digest.digest
       dig = dig[0, 16] if @auth_protocol == AuthProtocol::MD5
       dig
+    end
+
+    private def encryption
+      @encryption ||= case @priv_protocol
+                      when PrivacyProtocol::DES
+                        Encryption::DES.new(priv_key)
+                      when PrivacyProtocol::AES
+                        Encryption::AES.new(priv_key)
+                      end
     end
 
     private def authorizable?

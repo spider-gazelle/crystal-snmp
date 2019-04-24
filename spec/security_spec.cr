@@ -36,7 +36,7 @@ describe SNMP::Security do
     sec.priv_key.should eq(Bytes[0x66, 0x95, 0xfe, 0xbc, 0x92, 0x88, 0xe3, 0x62, 0x82, 0x23, 0x5f, 0xc7, 0x15, 0x1f, 0x12, 0x84, 0x97, 0xb3, 0x8f, 0x3f])
   end
 
-  it "should known when to revalidate" do
+  it "should know when to revalidate" do
     engine_id = Bytes[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]
     password = "maplesyrup"
     sec = SNMP::Security.new("username", engine_id, SNMP::Security::AuthProtocol::MD5, password, priv_password: "maplesyrup")
