@@ -1,27 +1,25 @@
-class SNMP
-  class V1Trap < Trap
-    def initialize(ber : ASN1::BER)
-      pdu = ber.children
-      @oid = pdu[0].get_object_id
-      @agent_address = pdu[1].payload.join(".")
-      @generic_trap = GenericTrap.from_value(pdu[2].get_integer)
-      @specific_trap = pdu[3].get_integer.to_i32
-      @time_ticks = SNMP.get_unsigned32(pdu[4])
-      @varbinds = pdu[5].children.map do |varbind|
-        VarBind.new(varbind)
-      end
-
-      # Compatibility with regular PDUs
-      # V1 traps are very different: https://tools.ietf.org/html/rfc1157#page-27
-      @request_id = 0
-      @error_status = ErrorStatus::NoError
-      @error_index = 0
+class SNMP::V1Trap < SNMP::Trap
+  def initialize(ber : ASN1::BER)
+    pdu = ber.children
+    @oid = pdu[0].get_object_id
+    @agent_address = pdu[1].payload.join(".")
+    @generic_trap = GenericTrap.from_value(pdu[2].get_integer)
+    @specific_trap = pdu[3].get_integer.to_i32
+    @time_ticks = SNMP.get_unsigned32(pdu[4])
+    @varbinds = pdu[5].children.map do |varbind|
+      VarBind.new(varbind)
     end
 
-    property oid : String
-    property agent_address : String
-    property generic_trap : GenericTrap
-    property specific_trap : Int32
-    property time_ticks : UInt32
+    # Compatibility with regular PDUs
+    # V1 traps are very different: https://tools.ietf.org/html/rfc1157#page-27
+    @request_id = 0
+    @error_status = ErrorStatus::NoError
+    @error_index = 0
   end
+
+  property oid : String
+  property agent_address : String
+  property generic_trap : GenericTrap
+  property specific_trap : Int32
+  property time_ticks : UInt32
 end
