@@ -9,4 +9,8 @@ class SNMP::Trap < SNMP::PDU
 
   property time_ticks : UInt32
   property oid : String
+
+  def initialize(@oid, @time_ticks = 0, **args)
+    super(**args)
+  end
 end

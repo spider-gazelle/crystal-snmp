@@ -46,7 +46,7 @@ class SNMP::Message
 
   # Returns true if the current SNMP packet is expecting a response
   def expects_response?
-    {Request::GetRequest, Request::GetNext, Request::SetRequest, Request::GetBulk, Request::Inform}.includes? @request
+    {Request::Get, Request::GetNext, Request::Set, Request::GetBulk, Request::Inform}.includes? @request
   end
 
   # Builds a response object based on the current request

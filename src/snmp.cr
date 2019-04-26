@@ -12,10 +12,10 @@ class SNMP
   end
 
   enum Request
-    GetRequest
+    Get
     GetNext
     Response
-    SetRequest
+    Set
     V1_Trap
     GetBulk
     Inform
@@ -66,13 +66,13 @@ class SNMP
     Counter64 = 6
   end
 
-  def self.parse(message : ASN1::BER) : Message | V3::Message
+  def self.parse(message : ASN1::BER, session = nil) : Message | V3::Message
     snmp = message.children
     version = Version.from_value(snmp[0].get_integer)
 
     case version
     when Version::V3
-      V3::Message.new(snmp)
+      V3::Message.new(snmp, session)
     else
       Message.new(snmp)
     end
@@ -81,3 +81,4 @@ end
 
 require "./snmp/message"
 require "./snmp/v3/message"
+require "./snmp/v3/session"

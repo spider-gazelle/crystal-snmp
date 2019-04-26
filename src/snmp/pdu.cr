@@ -9,8 +9,7 @@ class SNMP::PDU
     end
   end
 
-  def initialize(@request_id, @error_status, @error_index)
-    @varbinds = [] of VarBind
+  def initialize(@request_id = 0, @error_status = ErrorStatus::NoError, @error_index = 0, @varbinds = [] of VarBind)
   end
 
   property request_id : Int32

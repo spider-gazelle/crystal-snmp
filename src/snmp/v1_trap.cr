@@ -17,9 +17,11 @@ class SNMP::V1Trap < SNMP::Trap
     @error_index = 0
   end
 
-  property oid : String
   property agent_address : String
   property generic_trap : GenericTrap
   property specific_trap : Int32
-  property time_ticks : UInt32
+
+  def initialize(@agent_address, @generic_trap, @specific_trap, **args)
+    super(**args)
+  end
 end
