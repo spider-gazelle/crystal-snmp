@@ -3,7 +3,7 @@ require "openssl/cipher"
 # Based on: https://github.com/swisscom/ruby-netsnmp/blob/master/lib/netsnmp/encryption/aes.rb
 
 class SNMP::V3::Security::AES
-  def initialize(@priv_key : String, @local = 0)
+  def initialize(@priv_key : Bytes, @local = 0)
   end
 
   def encrypt(decrypted_data : Bytes, engine_boots, engine_time)
@@ -59,14 +59,14 @@ class SNMP::V3::Security::AES
   # 8.1.1.1
   private def generate_encryption_key(boots, time)
     io = IO::Memory.new
-    io << 0xffu8 & (@local >> 56)
-    io << 0xffu8 & (@local >> 48)
-    io << 0xffu8 & (@local >> 40)
-    io << 0xffu8 & (@local >> 32)
-    io << 0xffu8 & (@local >> 24)
-    io << 0xffu8 & (@local >> 16)
-    io << 0xffu8 & (@local >> 8)
-    io << 0xffu8 & @local
+    io << (0xffu8 & (@local >> 56))
+    io << (0xffu8 & (@local >> 48))
+    io << (0xffu8 & (@local >> 40))
+    io << (0xffu8 & (@local >> 32))
+    io << (0xffu8 & (@local >> 24))
+    io << (0xffu8 & (@local >> 16))
+    io << (0xffu8 & (@local >> 8))
+    io << (0xffu8 & @local)
     salt = io.to_slice
 
     @local = @local == 0xffffffffffffffff ? 0 : @local + 1
@@ -77,14 +77,14 @@ class SNMP::V3::Security::AES
 
   private def generate_decryption_key(boots, time, salt : Bytes)
     io = IO::Memory.new
-    io << 0xffu8 & (boots >> 24)
-    io << 0xffu8 & (boots >> 16)
-    io << 0xffu8 & (boots >> 8)
-    io << 0xffu8 & boots
-    io << 0xffu8 & (time >> 24)
-    io << 0xffu8 & (time >> 16)
-    io << 0xffu8 & (time >> 8)
-    io << 0xffu8 & time
+    io << (0xffu8 & (boots >> 24))
+    io << (0xffu8 & (boots >> 16))
+    io << (0xffu8 & (boots >> 8))
+    io << (0xffu8 & boots)
+    io << (0xffu8 & (time >> 24))
+    io << (0xffu8 & (time >> 16))
+    io << (0xffu8 & (time >> 8))
+    io << (0xffu8 & time)
     io << salt
     io.to_slice
   end

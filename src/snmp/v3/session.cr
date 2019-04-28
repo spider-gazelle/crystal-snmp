@@ -11,9 +11,9 @@ class SNMP::V3::Session
   property priv_password : String
 
   def probe_for_engine
-    security_params = Security.new(@username)
-    pdu = ScopedPDU.new(Request::Get)
-    encoded_report_pdu = Message.encode(pdu, security_params)
+    security = Security.new(@username)
+    pdu = ScopedPDU.new(SNMP::Request::Get, SNMP::PDU.new)
+    encoded_report_pdu = V3::Message.encode(pdu, security)
 
     # TODO:: needs a client to send the message
     # response = client.send encoded_report_pdu

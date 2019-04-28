@@ -2,7 +2,7 @@
 class SNMP::V3::ScopedPDU
   def initialize(ber : ASN1::BER)
     pdu = ber.children
-    @engine_id = pdu[0].get_string
+    @engine_id = pdu[0].get_octet_string
     @context = if pdu[1].get_bytes.empty?
                  ""
                else
@@ -20,15 +20,7 @@ class SNMP::V3::ScopedPDU
     end
   end
 
-  def initialize(@request, @engine_id = "", @context = "", **args)
-    case @request
-    when Request::V1_Trap
-      @pdu = V1Trap.new(**args)
-    when Request::V2_Trap
-      @pdu = Trap.new(**args)
-    else
-      @pdu = PDU.new(**args)
-    end
+  def initialize(@request, @pdu, @engine_id = "", @context = "")
   end
 
   property engine_id : String
@@ -37,7 +29,7 @@ class SNMP::V3::ScopedPDU
   property pdu : PDU | Trap
 
   def to_ber
-    engine = ASN1::BER.new.set_string(@engine_id, ASN1::BER::UniversalTags::OctetString)
+    engine = ASN1::BER.new.set_octet_string(@engine_id)
     oid = if @context.empty?
             ASN1::BER.new.set_string("", tag: UniversalTags::OctetString)
           else
@@ -47,7 +39,7 @@ class SNMP::V3::ScopedPDU
     pdu = @pdu.to_ber(@request.to_u8)
 
     snmp = ASN1::BER.new
-    snmp.tag_number = ASN1::BER::UniversalTags::Sequence
+    snmp.tag_number = UniversalTags::Sequence
     snmp.children = {engine, oid, pdu}
     snmp
   end

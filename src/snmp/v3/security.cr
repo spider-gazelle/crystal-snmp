@@ -13,12 +13,6 @@ class SNMP::V3::Security
   # The 150 Seconds is specified in https://www.ietf.org/rfc/rfc2574.txt 2.2.3
   TIMELINESS_THRESHOLD = 150
 
-  enum SecLevel
-    NoAuth
-    AuthNoPriv
-    AuthWithPriv = 3
-  end
-
   enum AuthProtocol
     MD5
     SHA
@@ -30,8 +24,8 @@ class SNMP::V3::Security
   end
 
   getter username : String
-  getter engine_id : Bytes
-  getter security_level : SecLevel
+  getter engine_id : String
+  getter security_level : MessageFlags
   getter auth_protocol : AuthProtocol
   getter priv_protocol : PrivacyProtocol
   property timeliness : Int64 = 0_i64
@@ -41,18 +35,18 @@ class SNMP::V3::Security
 
   def initialize(
     @username,
-    @engine_id = Bytes.new(0),
+    @engine_id = "",
     @auth_protocol = AuthProtocol::MD5,
     @auth_password = "",
     @priv_protocol = PrivacyProtocol::DES,
     @priv_password = ""
   )
     @security_level = if !@priv_password.empty?
-                        SecLevel::AuthWithPriv
+                        MessageFlags::Authentication | MessageFlags::Privacy
                       elsif !@auth_password.empty?
-                        SecLevel::AuthNoPriv
+                        MessageFlags::Authentication
                       else
-                        SecLevel::NoAuth
+                        MessageFlags::None
                       end
 
     @digest = case @auth_protocol
@@ -64,12 +58,12 @@ class SNMP::V3::Security
                 raise "unsupported digest protocol"
               end
 
-    if @security_level > SecLevel::NoAuth
+    if @security_level > MessageFlags::None
       raise "auth password must have between 8 to 32 characters" unless (8..32).covers?(@auth_password.size)
       @auth_pass_key = passkey(@auth_password)
     end
 
-    if @security_level == SecLevel::AuthWithPriv
+    if @security_level == (MessageFlags::Authentication | MessageFlags::Privacy)
       raise "priv password must have between 8 to 32 characters" unless (8..32).covers?(@priv_password.size)
       @priv_pass_key = passkey(@priv_password)
     end
@@ -107,7 +101,7 @@ class SNMP::V3::Security
 
   def sign(message)
     # don't sign unless you have to
-    return nil if @security_level == SecLevel::NoAuth
+    return nil if @security_level == MessageFlags::None
 
     io = IO::Memory.new
     io.write auth_key
@@ -126,23 +120,23 @@ class SNMP::V3::Security
 
     io = IO::Memory.new
     io.write k1
-    io.write message
+    io.write_bytes message
 
-    digest.reset
-    digest << io.to_slice
-    d1 = digest.digest
+    @digest.reset
+    @digest << io.to_slice
+    d1 = @digest.digest
 
     io = IO::Memory.new
     io.write k2
     io.write d1
 
-    digest.reset
-    digest << io.to_slice
-    digest.digest[0, 12]
+    @digest.reset
+    @digest << io.to_slice
+    @digest.digest[0, 12]
   end
 
   def verify(stream, salt)
-    return if @security_level == SecLevel::NoAuth
+    return if @security_level == MessageFlags::None
     verisalt = sign(stream)
     raise "invalid message authentication salt" unless verisalt == salt
   end
@@ -170,7 +164,7 @@ class SNMP::V3::Security
   private def localize_key(key)
     @digest.reset
     @digest << key
-    @digest << @engine_id
+    @digest << @engine_id.hexbytes
     @digest << key
 
     @digest.digest
@@ -194,17 +188,22 @@ class SNMP::V3::Security
     dig
   end
 
-  private def encryption
-    @encryption ||= case @priv_protocol
+  @encryption : (AES | DES)?
+  private def encryption : AES | DES
+    crypt = @encryption
+    crypt ||= case @priv_protocol
                     when PrivacyProtocol::DES
-                      Encryption::DES.new(priv_key)
+                      DES.new(priv_key)
                     when PrivacyProtocol::AES
-                      Encryption::AES.new(priv_key)
+                      AES.new(priv_key)
+                    else
+                      raise "unknown privacy protocol"
                     end
+    @encryption = crypt
   end
 
   private def authorizable?
-    @security_level > SecLevel::NoAuth
+    @security_level > MessageFlags::None
   end
 end
 

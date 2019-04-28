@@ -1,7 +1,35 @@
 require "bindata/asn1"
 
 class SNMP
+  alias UniversalTags = ASN1::BER::UniversalTags
+
   module V3
+    # SNMPv3 message flags describing the features used
+    @[Flags]
+    enum MessageFlags
+      # privacy without authentication is not allowed
+      Authentication
+
+      # encryption applied?
+      Privacy
+
+      # Report PDU must be returned to the sender under those conditions that can cause the generation of a Report PDU
+      # when the flag is zero, a Report PDU may not be sent.
+      # The reportableFlag is set to 1 by the sender in all messages containing a request (Get, Set) or an Inform, and set to 0 for messages containing a Response, a Trap, or a Report PDU
+      # It is used only in cases in which the PDU portion of the message cannot be decoded (for example, when decryption fails because of incorrect key)
+      Reportable
+    end
+
+    enum SecurityModel
+      # Any = 0
+      SNMPv1
+      SNMPv2
+
+      # When an SNMP message contains a payload that expects a response (for example, a Get, GetNext, GetBulk, Set, or Inform PDU), then the receiver of such messages is authoritative.
+      # When an SNMP message contains a payload that does not expect a response (for example, an SNMPv2-Trap, Response, or Report PDU), then the sender of such a message is authoritative.
+      User
+      Transport # DTLS
+    end
   end
 
   # SNMP version codes

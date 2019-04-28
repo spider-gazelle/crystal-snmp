@@ -2,7 +2,7 @@ require "./helper"
 
 describe SNMP::V3::Security do
   it "should init a security helper" do
-    engine_id = Bytes[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]
+    engine_id = "000000000000000000000002"
     sec = SNMP::V3::Security.new("steve", engine_id)
 
     # password too short
@@ -13,7 +13,7 @@ describe SNMP::V3::Security do
 
   # FROM https://tools.ietf.org/html/rfc3414#appendix-A.2.1
   it "should generate correct passkeys" do
-    engine_id = Bytes[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]
+    engine_id = "000000000000000000000002"
     password = "maplesyrup"
 
     sec = SNMP::V3::Security.new("username", engine_id, auth_password: password)
@@ -24,7 +24,7 @@ describe SNMP::V3::Security do
   end
 
   it "should generate correct keys" do
-    engine_id = Bytes[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]
+    engine_id = "000000000000000000000002"
     password = "maplesyrup"
 
     sec = SNMP::V3::Security.new("username", engine_id, SNMP::V3::Security::AuthProtocol::MD5, password, priv_password: "maplesyrup")
@@ -37,19 +37,19 @@ describe SNMP::V3::Security do
   end
 
   it "should know when to revalidate" do
-    engine_id = Bytes[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]
+    engine_id = "000000000000000000000002"
     password = "maplesyrup"
     sec = SNMP::V3::Security.new("username", engine_id, SNMP::V3::Security::AuthProtocol::MD5, password, priv_password: "maplesyrup")
 
     sec.must_revalidate?.should eq(true)
 
-    sec.engine_id = "NEWENGINE".to_slice
+    sec.engine_id = "NEWENGINE"
     sec.must_revalidate?.should eq(false)
 
     sec.timeliness = Time.monotonic.to_i - 150
     sec.must_revalidate?.should eq(true)
 
-    sec.engine_id = "UPDATEDENGINE".to_slice
+    sec.engine_id = "UPDATEDENGINE"
     sec.must_revalidate?.should eq(false)
   end
 end
