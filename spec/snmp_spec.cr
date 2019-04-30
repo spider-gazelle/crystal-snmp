@@ -46,4 +46,42 @@ describe SNMP do
 
     io2.to_slice.should eq(b)
   end
+
+  it "should be able to parse a SNMP v3 probe and responses" do
+    # Parse probe request
+    bytes = "303e020103301102042841a2ed020300ffe30401040201030410300e0400020100020100040004000400301404000400a00e02042c52f7770201000201003000"
+    io = IO::Memory.new(bytes.hexbytes)
+    snmp = SNMP.parse(io.read_bytes(ASN1::BER))
+
+    # Ensure it serialises to the same value
+    io2 = IO::Memory.new
+    io2.write_bytes snmp
+    io2.to_slice.should eq(io.to_slice)
+
+    # Parse the probe response
+    bytes = "3068020103301102042841a2ed020300ffe3040100020103041d301b040c0000000000000000000000020201040202034d0400040004003031040c0000000000000000000000020400a81f02042c52f7770201000201003011300f060a2b060106030f01010400410105"
+    io = IO::Memory.new(bytes.hexbytes)
+    snmp = SNMP.parse(io.read_bytes(ASN1::BER))
+
+    io2 = IO::Memory.new
+    io2.write_bytes snmp
+    io2.to_slice.should eq(io.to_slice)
+
+    # Parse additional requests
+    bytes = "3069020103301102042841a2ec020300ffe304010402010304243022040c0000000000000000000000020201040202034d0407617574686d643504000400302b040c0000000000000000000000020400a11902042c52f776020100020100300b300906052b060102010500"
+    io = IO::Memory.new(bytes.hexbytes)
+    snmp = SNMP.parse(io.read_bytes(ASN1::BER))
+
+    io2 = IO::Memory.new
+    io2.write_bytes snmp
+    io2.to_slice.should eq(io.to_slice)
+
+    bytes = "306c020103301102042841a2ec020300ffe304010002010304243022040c0000000000000000000000020201040202034d0407617574686d643504000400302e040c0000000000000000000000020400a81c0201000201000201003011300f060a2b060106030f01010100410103"
+    io = IO::Memory.new(bytes.hexbytes)
+    snmp = SNMP.parse(io.read_bytes(ASN1::BER))
+
+    io2 = IO::Memory.new
+    io2.write_bytes snmp
+    io2.to_slice.should eq(io.to_slice)
+  end
 end

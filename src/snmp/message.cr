@@ -56,7 +56,7 @@ class SNMP::Message
 
   # IO serialisation support
   def self.from_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
-    Message.new(io.read_bytes(ASN1::BER))
+    self.class.new(io.read_bytes(ASN1::BER))
   end
 
   def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
