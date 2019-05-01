@@ -99,9 +99,9 @@ class SNMP::V3::Security
     end
   end
 
-  def sign(message)
+  def sign(message : ASN1::BER)
     # don't sign unless you have to
-    return nil if @security_level == MessageFlags::None
+    return Bytes.new(0) if @security_level == MessageFlags::None
 
     io = IO::Memory.new
     io.write auth_key

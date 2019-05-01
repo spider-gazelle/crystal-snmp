@@ -1,24 +1,17 @@
-# This is not really a PDU, but a container for a PDU
 class SNMP::V3::Session
-  def initialize(@username, @auth_protocol = Security::AuthProtocol::MD5, @priv_protocol = Security::PrivacyProtocol::DES, @auth_password = "", @priv_password = "")
+  def initialize(@username = "", @engine_id = "", @auth_protocol = Security::AuthProtocol::MD5, @priv_protocol = Security::PrivacyProtocol::DES, @auth_password = "", @priv_password = "")
   end
 
   property username : String
-  property engine_id : String?
+  property engine_id : String
   property auth_protocol : Security::AuthProtocol
   property priv_protocol : Security::PrivacyProtocol
   property auth_password : String
   property priv_password : String
 
-  def probe_for_engine
-    security = Security.new(@username)
-    pdu = ScopedPDU.new(SNMP::Request::Get, SNMP::PDU.new)
-    encoded_report_pdu = V3::Message.encode(pdu, security)
-
-    # TODO:: needs a client to send the message
-    # response = client.send encoded_report_pdu
-
-    #_, engine_id, @engine_boots, @engine_time = decode(encoded_response_pdu, security_parameters: report_sec_params)
-    #engine_id
+  def engine_id_probe
+    security_params = SecurityParams.new
+    scoped_pdu = ScopedPDU.new(SNMP::Request::Get, SNMP::PDU.new)
+    V3::Message.new(scoped_pdu, security_params, security_model: SecurityModel::Transport)
   end
 end

@@ -19,8 +19,8 @@ class SNMP::V3::SecurityParams
     @priv_param = parts[5].get_bytes
   end
 
-  AUTHNONE = ASN1::BER.new.set_string("\x00" * 12, tag: UniversalTags::OctetString)
-  def initialize(@username, @engine_id = "", @engine_boots = 0, @engine_time = 0, @priv_param = "".to_slice, @auth_param = AUTHNONE)
+  EMPTY_SLICE = Bytes.new(0)
+  def initialize(@username = "", @engine_id = "", @engine_boots = 0, @engine_time = 0, @priv_param = EMPTY_SLICE, @auth_param = EMPTY_SLICE)
   end
 
   property engine_id : String

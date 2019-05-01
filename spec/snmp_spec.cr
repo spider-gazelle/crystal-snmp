@@ -84,4 +84,29 @@ describe SNMP do
     io2.write_bytes snmp
     io2.to_slice.should eq(io.to_slice)
   end
+
+  it "should be able to generate a probe request" do
+    bytes = "303e020103301102042841a2ed020300ffe30401040201030410300e0400020100020100040004000400301404000400a00e02042c52f7770201000201003000"
+
+    message = SNMP::V3::Session.new("authmd5").engine_id_probe
+    message.pdu.request_id = 743634807
+    message.id = 675390189
+    io = IO::Memory.new
+    io.write_bytes message
+
+    io.to_slice.should eq(bytes.hexbytes)
+  end
+
+  it "should sign a request" do
+    engine_id = "000000000000000000000002"
+    password = "maplesyrup"
+    security = SNMP::V3::Security.new("username", engine_id, SNMP::V3::Security::AuthProtocol::MD5, password, priv_password: "maplesyrup")
+
+    message = SNMP::V3::Session.new("authmd5").engine_id_probe
+    message.pdu.request_id = 743634807
+    message.id = 675390189
+
+    message.sign(security)
+    message.security_params.auth_param.hexstring.should eq("c16f59f8f047b80b8c2cf950")
+  end
 end
