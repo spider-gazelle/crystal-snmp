@@ -6,13 +6,6 @@ class SNMP::V3::Security
   IPAD = Bytes.new(64, 0x36)
   OPAD = Bytes.new(64, 0x5c)
 
-  # Timeliness is part of SNMP V3 Security
-  # The topic is described very nice here https://www.snmpsharpnet.com/?page_id=28
-  # https://www.ietf.org/rfc/rfc2574.txt 1.4.1 Timeliness
-  # The probe is outdated after 150 seconds which results in a PDU Error, therefore it should expire before that and be renewed
-  # The 150 Seconds is specified in https://www.ietf.org/rfc/rfc2574.txt 2.2.3
-  TIMELINESS_THRESHOLD = 150
-
   enum AuthProtocol
     MD5
     SHA
@@ -23,12 +16,11 @@ class SNMP::V3::Security
     AES
   end
 
+  property engine_id : String
   getter username : String
-  getter engine_id : String
   getter security_level : MessageFlags
   getter auth_protocol : AuthProtocol
   getter priv_protocol : PrivacyProtocol
-  property timeliness : Int64 = 0_i64
   @auth_pass_key : Bytes = Bytes.new(0)
   @priv_pass_key : Bytes = Bytes.new(0)
   @digest : OpenSSL::Digest
@@ -69,33 +61,29 @@ class SNMP::V3::Security
     end
   end
 
-  def engine_id=(id)
-    @timeliness = Time.monotonic.to_i
-    @engine_id = id
-  end
-
-  def encode(pdu : ASN1::BER, salt : ASN1::BER, engine_time, engine_boots)
+  # NO_SALT = ASN1::BER.new.set_string("", UniversalTags::OctetString)
+  def encode(pdu : ASN1::BER, engine_time, engine_boots)
     if crypt = encryption
       io = IO::Memory.new
       io.write_bytes pdu
 
       encrypted_pdu, salt = crypt.encrypt(io.to_slice, engine_boots: engine_boots, engine_time: engine_time)
       pdu = ASN1::BER.new.set_string(encrypted_pdu, UniversalTags::OctetString)
-      salt = ASN1::BER.new.set_string(salt, UniversalTags::OctetString)
+      # salt = ASN1::BER.new.set_string(salt, UniversalTags::OctetString)
 
-      {pdu, salt}
+      {pdu, salt.to_slice}
     else
-      {pdu, salt}
+      {pdu, Bytes.new(0)}
     end
   end
 
-  def decode(der : ASN1::BER, salt : ASN1::BER, engine_time, engine_boots)
+  def decode(pdu : ASN1::BER, salt : Bytes, engine_time, engine_boots)
     if crypt = encryption
-      encrypted_pdu = der.get_bytes
-      pdu_der = crypt.decrypt(encrypted_pdu, salt: salt.get_bytes, engine_time: engine_time, engine_boots: engine_boots)
+      encrypted_pdu = pdu.get_bytes
+      pdu_der = crypt.decrypt(encrypted_pdu, salt: salt, engine_time: engine_time, engine_boots: engine_boots)
       pdu_der.read_bytes(ASN1::BER)
     else
-      der
+      pdu
     end
   end
 
@@ -133,18 +121,6 @@ class SNMP::V3::Security
     @digest.reset
     @digest << io.to_slice
     @digest.digest[0, 12]
-  end
-
-  def verify(stream, salt)
-    return if @security_level == MessageFlags::None
-    verisalt = sign(stream)
-    raise "invalid message authentication salt" unless verisalt == salt
-  end
-
-  def must_revalidate?
-    return @engine_id.empty? unless authorizable?
-    return true if @engine_id.empty? || @timeliness.nil?
-    (Time.monotonic.to_i - @timeliness) >= TIMELINESS_THRESHOLD
   end
 
   @auth_key : Bytes = Bytes.new(0)
@@ -200,10 +176,6 @@ class SNMP::V3::Security
                       raise "unknown privacy protocol"
                     end
     @encryption = crypt
-  end
-
-  private def authorizable?
-    @security_level > MessageFlags::None
   end
 end
 

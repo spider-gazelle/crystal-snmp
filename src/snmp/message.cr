@@ -54,12 +54,7 @@ class SNMP::Message
     self.class.new(@version, @community, Request::Response, @pdu.request_id)
   end
 
-  # IO serialisation support
-  def self.from_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
-    self.class.new(io.read_bytes(ASN1::BER))
-  end
-
-  def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
+  def to_ber
     ver = ASN1::BER.new.set_integer(@version.to_i)
     com = ASN1::BER.new.set_string(@community, ASN1::BER::UniversalTags::OctetString)
     pdu = @pdu.to_ber(@request.to_u8)
@@ -68,6 +63,15 @@ class SNMP::Message
     snmp = ASN1::BER.new
     snmp.tag_number = ASN1::BER::UniversalTags::Sequence
     snmp.children = {ver, com, pdu}
-    snmp.write(io)
+    snmp
+  end
+
+  # IO serialisation support
+  def self.from_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
+    self.class.new(io.read_bytes(ASN1::BER))
+  end
+
+  def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
+    self.to_ber.write(io)
   end
 end

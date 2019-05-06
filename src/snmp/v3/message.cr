@@ -25,15 +25,32 @@ class SNMP::V3::Message < SNMP::Message
     if snmp[3].tag == UniversalTags::Sequence
       @scoped_pdu = ScopedPDU.new(snmp[3])
     elsif security
-      @scoped_pdu = ScopedPDU.new(security.decode(snmp[3]))
+      @scoped_pdu = ScopedPDU.new(security.decode(snmp[3], @security_params.priv_param, @security_params.engine_time, @security_params.engine_boots))
+      verify(security, snmp[3])
     else
-      raise "session required to decode PDU"
+      raise "session security required to decode PDU"
     end
 
     # For compatibility with SNMPv2 Message class
+    @community = @security_params.engine_id
     @request = @scoped_pdu.request
-    @community = @scoped_pdu.engine_id
     @pdu = @scoped_pdu.pdu
+  end
+
+  def engine_id
+    @security_params.engine_id
+  end
+
+  def engine_id=(id)
+    @security_params.engine_id = @community = id
+  end
+
+  def community=(id)
+    @security_params.engine_id = @community = id
+  end
+
+  def request=(type : Request)
+    @scoped_pdu.request = @request = type
   end
 
   def initialize(@scoped_pdu : ScopedPDU, @security_params : SecurityParams, security : Security? = nil, @security_model = SecurityModel::User, @id = rand(2147483647))
@@ -45,15 +62,21 @@ class SNMP::V3::Message < SNMP::Message
       @flags = MessageFlags::Reportable
     end
 
+    @community = @security_params.engine_id
     @request = @scoped_pdu.request
-    @community = @scoped_pdu.engine_id
     @pdu = @scoped_pdu.pdu
   end
 
-  AUTHNONE = ASN1::BER.new.set_string("\x00" * 12, tag: UniversalTags::OctetString)
-  PRIVNONE           = ASN1::BER.new.set_string("", tag: UniversalTags::OctetString)
-  MSG_MAX_SIZE       = ASN1::BER.new.set_integer(65507)
-  MSG_VERSION        = ASN1::BER.new.set_integer(Version::V3.to_i)
+  AUTHNONE     = ASN1::BER.new.set_string("\x00" * 12, tag: UniversalTags::OctetString)
+  PRIVNONE     = ASN1::BER.new.set_string("", tag: UniversalTags::OctetString)
+  MSG_MAX_SIZE = ASN1::BER.new.set_integer(65507)
+  MSG_VERSION  = ASN1::BER.new.set_integer(Version::V3.to_i)
+
+  def verify(security, scoped_pdu = @scoped_pdu.to_ber)
+    return if security.security_level == MessageFlags::None
+    existing_signature, signature = sign(security, scoped_pdu)
+    raise "invalid message authentication salt" unless existing_signature == signature
+  end
 
   def sign(security, scoped_pdu = @scoped_pdu.to_ber)
     # ensure auth param is 0'd
@@ -96,10 +119,6 @@ class SNMP::V3::Message < SNMP::Message
     }
 
     encoded
-  end
-
-  def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
-    self.to_ber.write(io)
   end
 
   property id : Int32

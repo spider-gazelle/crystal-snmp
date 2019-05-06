@@ -35,21 +35,4 @@ describe SNMP::V3::Security do
     sec.auth_key.should eq(Bytes[0x66, 0x95, 0xfe, 0xbc, 0x92, 0x88, 0xe3, 0x62, 0x82, 0x23, 0x5f, 0xc7, 0x15, 0x1f, 0x12, 0x84, 0x97, 0xb3, 0x8f, 0x3f])
     sec.priv_key.should eq(Bytes[0x66, 0x95, 0xfe, 0xbc, 0x92, 0x88, 0xe3, 0x62, 0x82, 0x23, 0x5f, 0xc7, 0x15, 0x1f, 0x12, 0x84, 0x97, 0xb3, 0x8f, 0x3f])
   end
-
-  it "should know when to revalidate" do
-    engine_id = "000000000000000000000002"
-    password = "maplesyrup"
-    sec = SNMP::V3::Security.new("username", engine_id, SNMP::V3::Security::AuthProtocol::MD5, password, priv_password: "maplesyrup")
-
-    sec.must_revalidate?.should eq(true)
-
-    sec.engine_id = "NEWENGINE"
-    sec.must_revalidate?.should eq(false)
-
-    sec.timeliness = Time.monotonic.to_i - 150
-    sec.must_revalidate?.should eq(true)
-
-    sec.engine_id = "UPDATEDENGINE"
-    sec.must_revalidate?.should eq(false)
-  end
 end
