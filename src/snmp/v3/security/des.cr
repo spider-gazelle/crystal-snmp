@@ -36,7 +36,7 @@ class SNMP::V3::Security::DES
     raise "invalid encrypted PDU received" unless (encrypted_data.size % 8).zero?
 
     cipher = OpenSSL::Cipher.new("des-cbc")
-    cipher.padding = 0
+    cipher.padding = false
 
     iv = generate_decryption_key(salt)
 

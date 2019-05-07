@@ -17,6 +17,10 @@ class SNMP::PDU
   property error_index : Int32
   property varbinds : Array(VarBind)
 
+  def new_request_id
+    @request_id = rand(2147483647)
+  end
+
   def to_ber(tag_number)
     req = ASN1::BER.new
     req.set_integer(@request_id)

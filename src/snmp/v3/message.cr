@@ -22,11 +22,16 @@ class SNMP::V3::Message < SNMP::Message
     @security_params = SecurityParams.new(snmp[2])
 
     # This data is encrypted if response is an OctetString
-    if snmp[3].tag == UniversalTags::Sequence
+    if security
+      if @flags.privacy?
+        @scoped_pdu = ScopedPDU.new(security.decode(snmp[3], @security_params.priv_param, @security_params.engine_time, @security_params.engine_boots))
+        verify(security, snmp[3])
+      else
+        @scoped_pdu = ScopedPDU.new(snmp[3])
+        verify(security, snmp[3]) if @flags.authentication?
+      end
+    elsif snmp[3].tag == UniversalTags::Sequence
       @scoped_pdu = ScopedPDU.new(snmp[3])
-    elsif security
-      @scoped_pdu = ScopedPDU.new(security.decode(snmp[3], @security_params.priv_param, @security_params.engine_time, @security_params.engine_boots))
-      verify(security, snmp[3])
     else
       raise "session security required to decode PDU"
     end
@@ -36,6 +41,27 @@ class SNMP::V3::Message < SNMP::Message
     @request = @scoped_pdu.request
     @pdu = @scoped_pdu.pdu
   end
+
+  def initialize(@scoped_pdu : ScopedPDU, @security_params : SecurityParams, security : Security? = nil, @security_model = SecurityModel::User, @id = rand(2147483647))
+    @version = Version::V3
+    @max_size = 65507
+    if security
+      @flags = security.security_level | MessageFlags::Reportable
+    else
+      @flags = MessageFlags::Reportable
+    end
+
+    @community = @security_params.engine_id
+    @request = @scoped_pdu.request
+    @pdu = @scoped_pdu.pdu
+  end
+
+  property id : Int32
+  property max_size : Int32
+  property flags : MessageFlags
+  property security_model : SecurityModel
+  property security_params : SecurityParams
+  property scoped_pdu : ScopedPDU
 
   def engine_id
     @security_params.engine_id
@@ -53,18 +79,13 @@ class SNMP::V3::Message < SNMP::Message
     @scoped_pdu.request = @request = type
   end
 
-  def initialize(@scoped_pdu : ScopedPDU, @security_params : SecurityParams, security : Security? = nil, @security_model = SecurityModel::User, @id = rand(2147483647))
-    @version = Version::V3
-    @max_size = 65507
-    if security
-      @flags = security.security_level | MessageFlags::Reportable
-    else
-      @flags = MessageFlags::Reportable
-    end
+  def pdu=(pdu)
+    @scoped_pdu.pdu = @pdu = pdu
+  end
 
-    @community = @security_params.engine_id
-    @request = @scoped_pdu.request
-    @pdu = @scoped_pdu.pdu
+  def new_request_id
+    @pdu.new_request_id
+    @id = rand(2147483647)
   end
 
   AUTHNONE     = ASN1::BER.new.set_string("\x00" * 12, tag: UniversalTags::OctetString)
@@ -120,11 +141,4 @@ class SNMP::V3::Message < SNMP::Message
 
     encoded
   end
-
-  property id : Int32
-  property max_size : Int32
-  property flags : MessageFlags
-  property security_model : SecurityModel
-  property security_params : SecurityParams
-  property scoped_pdu : ScopedPDU
 end

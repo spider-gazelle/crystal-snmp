@@ -35,7 +35,7 @@ class SNMP::V3::Security::AES
     raise "invalid priv salt received" unless (salt.size % 8).zero?
 
     cipher = OpenSSL::Cipher.new("aes-128-cfb")
-    cipher.padding = 0
+    cipher.padding = false
 
     iv = generate_decryption_key(engine_boots, engine_time, salt)
 

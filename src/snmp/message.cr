@@ -54,10 +54,19 @@ class SNMP::Message
     self.class.new(@version, @community, Request::Response, @pdu.request_id)
   end
 
-  def to_ber
+  def new_request_id
+    @pdu.new_request_id
+  end
+
+  def get(oid)
+    self.pdu = PDU.new(varbinds: [VarBind.new(oid)])
+    self.request = Request::Get
+    self
+  end
+
+  def to_ber(pdu = @pdu.to_ber(@request.to_u8))
     ver = ASN1::BER.new.set_integer(@version.to_i)
     com = ASN1::BER.new.set_string(@community, ASN1::BER::UniversalTags::OctetString)
-    pdu = @pdu.to_ber(@request.to_u8)
 
     # write SNMP sequence
     snmp = ASN1::BER.new
