@@ -5,7 +5,7 @@ class SNMP::V3::SecurityParams
     parts = security.children
 
     # 10-64 Hex characters
-    @engine_id = parts[0].get_octet_string
+    @engine_id = parts[0].get_hexstring
 
     # the number of times that this SNMP engine has initialized or reinitialized itself since its initial configuration.
     @engine_boots = parts[1].get_integer.to_i
@@ -31,18 +31,12 @@ class SNMP::V3::SecurityParams
   property priv_param : Bytes
 
   def to_ber(auth = @auth_param)
-    engine = ASN1::BER.new.set_octet_string(@engine_id)
+    engine = ASN1::BER.new.set_hexstring(@engine_id)
     boots = ASN1::BER.new.set_integer(@engine_boots)
     time = ASN1::BER.new.set_integer(@engine_time)
     user = ASN1::BER.new.set_string(@username, tag: UniversalTags::OctetString)
-
-    aparam = ASN1::BER.new
-    aparam.payload = auth
-    aparam.tag_number = UniversalTags::OctetString
-
-    pparam = ASN1::BER.new
-    pparam.payload = @priv_param
-    pparam.tag_number = UniversalTags::OctetString
+    aparam = ASN1::BER.new.set_bytes(auth)
+    pparam = ASN1::BER.new.set_bytes(@priv_param)
 
     # Build the params sequence
     params = ASN1::BER.new
@@ -52,9 +46,6 @@ class SNMP::V3::SecurityParams
     # Security params are stored in a generic octet string BER
     temp = IO::Memory.new
     temp.write_bytes params
-    sec_params = ASN1::BER.new
-    sec_params.payload = temp.to_slice
-    sec_params.tag_number = UniversalTags::OctetString
-    sec_params
+    ASN1::BER.new.set_bytes(temp)
   end
 end

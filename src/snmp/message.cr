@@ -60,6 +60,7 @@ class SNMP::Message
 
   def get(oid)
     self.pdu = PDU.new(varbinds: [VarBind.new(oid)])
+    self.pdu.varbinds[0].value.tag_number = UniversalTags::Null
     self.request = Request::Get
     self
   end

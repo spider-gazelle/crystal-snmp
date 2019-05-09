@@ -88,7 +88,7 @@ class SNMP::V3::Message < SNMP::Message
     @id = rand(2147483647)
   end
 
-  AUTHNONE     = ASN1::BER.new.set_string("\x00" * 12, tag: UniversalTags::OctetString)
+  AUTHNONE     = Bytes.new(12)
   PRIVNONE     = ASN1::BER.new.set_string("", tag: UniversalTags::OctetString)
   MSG_MAX_SIZE = ASN1::BER.new.set_integer(65507)
   MSG_VERSION  = ASN1::BER.new.set_integer(Version::V3.to_i)
@@ -102,9 +102,11 @@ class SNMP::V3::Message < SNMP::Message
   def sign(security, scoped_pdu = @scoped_pdu.to_ber)
     # ensure auth param is 0'd
     existing_signature = @security_params.auth_param
-    @security_params.auth_param = AUTHNONE.payload
+    @security_params.auth_param = AUTHNONE
 
     # Sign the request
+    e_id = engine_id
+    security.engine_id = e_id unless e_id.empty?
     signature = security.sign(to_ber(scoped_pdu))
     @security_params.auth_param = signature
 
