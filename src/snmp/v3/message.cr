@@ -105,8 +105,6 @@ class SNMP::V3::Message < SNMP::Message
     @security_params.auth_param = AUTHNONE
 
     # Sign the request
-    e_id = engine_id
-    security.engine_id = e_id unless e_id.empty?
     signature = security.sign(to_ber(scoped_pdu))
     @security_params.auth_param = signature
 
