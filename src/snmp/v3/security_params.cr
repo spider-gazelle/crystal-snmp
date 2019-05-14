@@ -20,6 +20,7 @@ class SNMP::V3::SecurityParams
   end
 
   EMPTY_SLICE = Bytes.new(0)
+
   def initialize(@username = "", @engine_id = "", @engine_boots = 0, @engine_time = 0, @priv_param = EMPTY_SLICE, @auth_param = EMPTY_SLICE)
   end
 

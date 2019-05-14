@@ -3,7 +3,7 @@ require "openssl/cipher"
 # Based on: https://github.com/swisscom/ruby-netsnmp/blob/master/lib/netsnmp/encryption/aes.rb
 
 class SNMP::V3::Security::DES
-  def initialize(@priv_key : Bytes, @local = 0)
+  def initialize(@priv_key : Bytes, @local = 0_u64)
   end
 
   def encrypt(decrypted_data : Bytes, engine_boots, engine_time = nil)
@@ -15,15 +15,20 @@ class SNMP::V3::Security::DES
     cipher.iv = iv
     cipher.key = des_key
 
-    if (diff = decrypted_data.bytesize % 8) != 0
+    if (diff = decrypted_data.size % 8) != 0
       io = IO::Memory.new
-      io << decrypted_data
+      io.write decrypted_data
       # Pad with 0's
       (0...(8 - diff)).each do
-        io << 0u8
+        io.write_byte 0u8
       end
       decrypted_data = io.to_slice
     end
+
+    # TODO:: Not sure why this is required...
+    # DES seems to convert 4 into 12 on decryption
+    decrypted_data[3] = 12u8 if decrypted_data[3] == 4u8
+    # -------
 
     encrypted_data = IO::Memory.new
     encrypted_data.write(cipher.update(decrypted_data))
@@ -49,10 +54,6 @@ class SNMP::V3::Security::DES
     decrypted_data.write cipher.final
     decrypted_data.rewind
 
-    # Don't think we need to remove the padding
-    # hlen, bodylen = OpenSSL::ASN1.traverse(decrypted_data) { |_, _, x, y, *| break x, y }
-    # decrypted_data.byteslice(0, hlen + bodylen)
-
     # Return as an IO so we can read out the BER directly
     decrypted_data
   end
@@ -60,17 +61,17 @@ class SNMP::V3::Security::DES
   # 8.1.1.1
   private def generate_encryption_key(boots)
     io = IO::Memory.new
-    io << (0xffu8 & (boots >> 24))
-    io << (0xffu8 & (boots >> 16))
-    io << (0xffu8 & (boots >> 8))
-    io << (0xffu8 & boots)
-    io << (0xffu8 & (@local >> 24))
-    io << (0xffu8 & (@local >> 16))
-    io << (0xffu8 & (@local >> 8))
-    io << (0xffu8 & @local)
+    io.write_byte(0xffu8 & (boots >> 24))
+    io.write_byte(0xffu8 & (boots >> 16))
+    io.write_byte(0xffu8 & (boots >> 8))
+    io.write_byte(0xffu8 & boots)
+    io.write_byte(0xffu8 & (@local >> 24))
+    io.write_byte(0xffu8 & (@local >> 16))
+    io.write_byte(0xffu8 & (@local >> 8))
+    io.write_byte(0xffu8 & @local)
     salt = io.to_slice
 
-    @local = @local == 0xffffffff ? 0 : @local + 1
+    @local = @local >= 0xffffffff_u64 ? 0_u64 : @local + 1_u64
 
     iv = generate_decryption_key(salt)
     {iv, salt}

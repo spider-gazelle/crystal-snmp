@@ -1,25 +1,24 @@
 class SNMP::V3::Session
-  def initialize(@username = "", @auth_protocol = Security::AuthProtocol::MD5, @priv_protocol = Security::PrivacyProtocol::DES, @auth_password = "", @priv_password = "")
-    @engine_id = ""
+  def initialize(username = "", auth_password = "", priv_password = "", @engine_id = "", auth_protocol = Security::AuthProtocol::MD5, priv_protocol = Security::PrivacyProtocol::DES)
     @engine_boots = 0
     @engine_time = 0
 
     @security = V3::Security.new(
-      @username,
+      username,
       @engine_id,
-      @auth_protocol,
-      @auth_password,
-      @priv_protocol,
-      @priv_password
+      auth_protocol,
+      auth_password,
+      priv_protocol,
+      priv_password
     )
   end
 
+  def initialize(@security : V3::Security, @engine_id = "")
+    @engine_boots = 0
+    @engine_time = 0
+  end
+
   getter engine_id : String
-  getter username : String
-  getter auth_protocol : Security::AuthProtocol
-  getter priv_protocol : Security::PrivacyProtocol
-  getter auth_password : String
-  getter priv_password : String
   getter timeliness : Int64 = 0_i64
   getter session_created : Int64 = 0_i64
   getter engine_time : Int32
@@ -50,6 +49,7 @@ class SNMP::V3::Session
     @engine_boots = message.security_params.engine_boots
     @engine_time = message.security_params.engine_time
     @timeliness = Time.monotonic.to_i
+    self
   end
 
   def prepare(message : V3::Message) : ASN1::BER

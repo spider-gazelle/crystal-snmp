@@ -22,16 +22,16 @@ class SNMP::V3::Message < SNMP::Message
     @security_params = SecurityParams.new(snmp[2])
 
     # This data is encrypted if response is an OctetString
-    if security
-      if @flags.privacy?
-        @scoped_pdu = ScopedPDU.new(security.decode(snmp[3], @security_params.priv_param, @security_params.engine_time, @security_params.engine_boots))
-        verify(security, snmp[3])
-      else
-        @scoped_pdu = ScopedPDU.new(snmp[3])
-        verify(security, snmp[3]) if @flags.authentication?
-      end
-    elsif snmp[3].tag == UniversalTags::Sequence
+    if snmp[3].tag == UniversalTags::Sequence
       @scoped_pdu = ScopedPDU.new(snmp[3])
+    elsif security
+      @scoped_pdu = if @flags.privacy?
+                      ber = security.decode(snmp[3], @security_params.priv_param, @security_params.engine_time, @security_params.engine_boots)
+                      ScopedPDU.new(ber)
+                    else
+                      ScopedPDU.new(snmp[3])
+                    end
+      verify(security, snmp[3]) if @flags.authentication?
     else
       raise "session security required to decode PDU"
     end
@@ -96,7 +96,7 @@ class SNMP::V3::Message < SNMP::Message
   def verify(security, scoped_pdu = @scoped_pdu.to_ber)
     return if security.security_level == MessageFlags::None
     existing_signature, signature = sign(security, scoped_pdu)
-    raise "invalid message authentication salt" unless existing_signature == signature
+    raise "message authentication failed. Salt did not match" unless existing_signature == signature
   end
 
   def sign(security, scoped_pdu = @scoped_pdu.to_ber)
@@ -126,7 +126,7 @@ class SNMP::V3::Message < SNMP::Message
       message_id,
       max,
       message_flags,
-      model
+      model,
     }
 
     # Build the complete message
@@ -136,7 +136,7 @@ class SNMP::V3::Message < SNMP::Message
       MSG_VERSION,
       headers,
       @security_params.to_ber,
-      scoped_pdu
+      scoped_pdu,
     }
 
     encoded

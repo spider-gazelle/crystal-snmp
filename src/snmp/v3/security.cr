@@ -61,7 +61,6 @@ class SNMP::V3::Security
     end
   end
 
-  # NO_SALT = ASN1::BER.new.set_string("", UniversalTags::OctetString)
   def encode(pdu : ASN1::BER, engine_time, engine_boots)
     if @security_level.privacy?
       crypt = encryption
@@ -69,8 +68,12 @@ class SNMP::V3::Security
       io.write_bytes pdu
 
       encrypted_pdu, salt = crypt.encrypt(io.to_slice, engine_boots: engine_boots, engine_time: engine_time)
-      pdu = ASN1::BER.new.set_string(encrypted_pdu, UniversalTags::OctetString)
-      # salt = ASN1::BER.new.set_string(salt, UniversalTags::OctetString)
+
+      # WTF: This does not match when using DES... Always out by 1 byte
+      # slice = io.to_slice
+      # crypt.decrypt(encrypted_pdu, salt, engine_boots, engine_time).to_slice[0...slice.size].should eq slice
+
+      pdu = ASN1::BER.new.set_bytes(encrypted_pdu)
       {pdu, salt.to_slice}
     else
       {pdu, Bytes.new(0)}
@@ -81,7 +84,8 @@ class SNMP::V3::Security
     if @security_level.privacy? && pdu.tag == UniversalTags::OctetString
       crypt = encryption
       encrypted_pdu = pdu.get_bytes
-      pdu_der = crypt.decrypt(encrypted_pdu, salt: salt, engine_time: engine_time, engine_boots: engine_boots)
+      pdu_der = crypt.decrypt(encrypted_pdu, salt, engine_boots, engine_time)
+
       pdu_der.read_bytes(ASN1::BER)
     else
       pdu
@@ -166,16 +170,17 @@ class SNMP::V3::Security
   end
 
   @encryption : (AES | DES)?
+
   private def encryption : AES | DES
     crypt = @encryption
     crypt ||= case @priv_protocol
-                    when PrivacyProtocol::DES
-                      DES.new(priv_key)
-                    when PrivacyProtocol::AES
-                      AES.new(priv_key)
-                    else
-                      raise "unknown privacy protocol"
-                    end
+              when PrivacyProtocol::DES
+                DES.new(priv_key)
+              when PrivacyProtocol::AES
+                AES.new(priv_key)
+              else
+                raise "unknown privacy protocol"
+              end
     @encryption = crypt
   end
 end
