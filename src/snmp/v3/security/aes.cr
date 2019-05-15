@@ -88,6 +88,6 @@ class SNMP::V3::Security::AES
   end
 
   private def aes_key
-    @priv_key[0, 16]
+    @priv_key[0, 16].clone
   end
 end

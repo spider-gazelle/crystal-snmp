@@ -9,7 +9,15 @@ class SNMP::PDU
     end
   end
 
-  def initialize(@request_id = rand(2147483647), @error_status = ErrorStatus::NoError, @error_index = 0, @varbinds = [] of VarBind)
+  def initialize(@request_id = rand(2147483647), @varbinds : Array(VarBind) = [] of VarBind, @error_status = ErrorStatus::NoError, @error_index = 0)
+  end
+
+  def initialize(@request_id = rand(2147483647), varbind : VarBind? = nil, @error_status = ErrorStatus::NoError, @error_index = 0)
+    if varbind
+      @varbinds = [varbind]
+    else
+      @varbinds = [] of VarBind
+    end
   end
 
   property request_id : Int32

@@ -202,6 +202,7 @@ describe SNMP do
 
   it "should be able to decrypt a SHA1 with AES request" do
     # Data from: http://snmplabs.com/snmpsim/public-snmp-agent-simulator.html
+    # `snmpwalk -v3 -l authPriv -u usr-sha-aes -a SHA -A authkey1 -x AES -X privkey1 demo.snmplabs.com 1.3.6`
     security = SNMP::V3::Security.new("usr-sha-aes", "80004fb805636c6f75644dab22cc", auth_protocol: SNMP::V3::Security::AuthProtocol::SHA, priv_protocol: SNMP::V3::Security::PrivacyProtocol::AES, auth_password: "authkey1", priv_password: "privkey1")
 
     data = "3081ea0201033011020478e1aaaa020300ffe3040103020103043f303d040e80004fb805636c6f75644dab22cc020109020306e7d2040b7573722d7368612d616573040cf2fefd4bd5b858414e7950b5040862c4a71169fbea90048190f43ae92699b793e4c5a432500da0c4e0213102d7b44fd2e9a62c830bd918bf150fb2b402bc3f4a2393a33274c4a2de1a10364e8fb8185c0a26cca23f381005b5c3415726beac676f180d519c73730bd02e1a50363ef342ed23c5acb55f90392b882a7117d97cde1bfee2f4b86efc4fb4e8cf5a6379db86db0a0f7dc1c33a1234d8b21b01303b31b3c5f7de225068d9ec"
@@ -214,6 +215,8 @@ describe SNMP do
   end
 
   it "should be able to decrypt a MD5 with AES request" do
+    # Samples taken from: http://snmplabs.com/snmpsim/public-snmp-agent-simulator.html
+    # `snmpwalk -v3 -l authPriv -u usr-md5-aes -a MD5 -A authkey1 -x AES -X privkey1 demo.snmplabs.com 1.3.6`
     security = SNMP::V3::Security.new("usr-md5-aes", "80004fb805636c6f75644dab22cc", auth_protocol: SNMP::V3::Security::AuthProtocol::MD5, priv_protocol: SNMP::V3::Security::PrivacyProtocol::AES, auth_password: "authkey1", priv_password: "privkey1")
 
     data = "308199020103301102045e6b982a020300ffe3040103020103043f303d040e80004fb805636c6f75644dab22cc02010a020300da3a040b7573722d6d64352d616573040ca949ba86c8137f6481ecaea6040866fe855b232d56060440666408c8821cee8833e9e537099bb3bbd860bbc8ce1fbcf3c4aafce06f0c36a3e5f35fca5e85c4de736e97a155c464ffeb29b338af635107294728bfd398ad0b"
@@ -238,5 +241,101 @@ describe SNMP do
     test = io.read_bytes(ASN1::BER)
     snmp = SNMP::V3::Message.new(test.children, security)
     snmp.varbinds[0].value.get_object_id.should eq("1.3.6.1.4.1.8072.3.2.10")
+  end
+
+  it "should generate valid MD5 authed requests" do
+    # Samples taken from: http://snmplabs.com/snmpsim/public-snmp-agent-simulator.html
+    # Monitoring traffic from the `snmpwalk` tool: `snmpwalk -v3 -l auth -u usr-md5-none -a MD5 -A authkey1 -O n demo.snmplabs.com 1.3.6`
+    session = SNMP::V3::Session.new("usr-md5-none", "authkey1")
+
+    # Emulate probe response
+    data = "3081a6020103301102042c32fc0e020300ffe304010102010304383036040e80004fb805636c6f75644dab22cc02010a0203015e36040c7573722d6d64352d6e6f6e65040c48c4a8a4843a6ad90d7c79fc04003054040e80004fb805636c6f75644dab22cc0400a2400204215f19c00201000201003032303006082b060102010104000424534e4d50204c61626f7261746f726965732c20696e666f40736e6d706c6162732e636f6d"
+    io = IO::Memory.new
+    io.write data.hexbytes
+    io.rewind
+    session.validate(io.read_bytes(ASN1::BER))
+
+    # Make a get_next (walk) request
+    message = session.get_next("1.3.6.1.2.1.1.4.0", 559880641, 741538831)
+    message = session.prepare(message)
+
+    io = IO::Memory.new
+    io.write_bytes message
+
+    # Ensure the message matches a known good example request
+    output = "308182020103301102042c32fc0f020300ffe304010502010304383036040e80004fb805636c6f75644dab22cc02010a0203015e36040c7573722d6d64352d6e6f6e65040c92aee8e66e14a35e6371b54c04003030040e80004fb805636c6f75644dab22cc0400a11c0204215f19c1020100020100300e300c06082b060102010104000500"
+    io.to_slice.hexstring.should eq(output)
+  end
+
+  it "should be able to query SNMPLabs with MD5 auth" do
+    # Connect to server
+    socket = UDPSocket.new
+    socket.connect("demo.snmplabs.com", 161)
+    socket.sync = false
+
+    # Setup session
+    session = SNMP::V3::Session.new("usr-md5-none", "authkey1")
+    if session.must_revalidate?
+      socket.write_bytes session.engine_validation_probe
+      socket.flush
+      session.validate socket.read_bytes(ASN1::BER)
+    end
+
+    # Make request
+    ber = session.prepare(session.get("1.3.6.1.2.1.1.4.0"))
+    socket.write_bytes ber
+    socket.flush
+
+    # Process response
+    response = session.parse(socket.read_bytes(ASN1::BER))
+    response.value.get_string.should eq("SNMP Laboratories, info@snmplabs.com")
+  end
+
+  it "should be able to query SNMPLabs with MD5 and AES auth" do
+    # Connect to server
+    socket = UDPSocket.new
+    socket.connect("demo.snmplabs.com", 161)
+    socket.sync = false
+
+    # Setup session
+    session = SNMP::V3::Session.new("usr-md5-aes", "authkey1", "privkey1", priv_protocol: SNMP::V3::Security::PrivacyProtocol::AES)
+    if session.must_revalidate?
+      socket.write_bytes session.engine_validation_probe
+      socket.flush
+      session.validate socket.read_bytes(ASN1::BER)
+    end
+
+    # Make request
+    ber = session.prepare(session.get("1.3.6.1.2.1.1.4.0"))
+    socket.write_bytes ber
+    socket.flush
+
+    # Process response
+    response = session.parse(socket.read_bytes(ASN1::BER))
+    response.value.get_string.should eq("SNMP Laboratories, info@snmplabs.com")
+  end
+
+  it "should be able to query SNMPLabs with MD5 and DES auth" do
+    # Connect to server
+    socket = UDPSocket.new
+    socket.connect("demo.snmplabs.com", 161)
+    socket.sync = false
+
+    # Setup session
+    session = SNMP::V3::Session.new("usr-md5-des", "authkey1", "privkey1")
+    if session.must_revalidate?
+      socket.write_bytes session.engine_validation_probe
+      socket.flush
+      session.validate socket.read_bytes(ASN1::BER)
+    end
+
+    # Make request
+    ber = session.prepare(session.get("1.3.6.1.2.1.1.4.0"))
+    socket.write_bytes ber
+    socket.flush
+
+    # Process response
+    response = session.parse(socket.read_bytes(ASN1::BER))
+    response.value.get_string.should eq("SNMP Laboratories, info@snmplabs.com")
   end
 end

@@ -3,7 +3,7 @@ require "openssl/cipher"
 # Based on: https://github.com/swisscom/ruby-netsnmp/blob/master/lib/netsnmp/encryption/aes.rb
 
 class SNMP::V3::Security::DES
-  def initialize(@priv_key : Bytes, @local = 0_u64)
+  def initialize(@priv_key : Bytes, @local = rand(0xffffffff_u64))
   end
 
   def encrypt(decrypted_data : Bytes, engine_boots, engine_time = nil)
@@ -24,11 +24,6 @@ class SNMP::V3::Security::DES
       end
       decrypted_data = io.to_slice
     end
-
-    # TODO:: Not sure why this is required...
-    # DES seems to convert 4 into 12 on decryption
-    decrypted_data[3] = 12u8 if decrypted_data[3] == 4u8
-    # -------
 
     encrypted_data = IO::Memory.new
     encrypted_data.write(cipher.update(decrypted_data))
@@ -78,7 +73,7 @@ class SNMP::V3::Security::DES
   end
 
   private def generate_decryption_key(salt : Bytes)
-    iv = @priv_key[8, 8].to_slice
+    iv = @priv_key[8, 8].to_slice.clone
     iv.each_with_index do |byte, index|
       iv[index] = byte ^ salt[index]
     end
@@ -86,6 +81,6 @@ class SNMP::V3::Security::DES
   end
 
   private def des_key
-    @priv_key[0, 8]
+    @priv_key[0, 8].clone
   end
 end

@@ -6,6 +6,9 @@ class SNMP::V3::Security
   IPAD = Bytes.new(64, 0x36)
   OPAD = Bytes.new(64, 0x5c)
 
+  class Error < Exception
+  end
+
   enum AuthProtocol
     MD5
     SHA
@@ -47,17 +50,26 @@ class SNMP::V3::Security
               when AuthProtocol::SHA
                 OpenSSL::Digest.new("sha1")
               else
-                raise "unsupported digest protocol"
+                raise ArgumentError.new("unsupported digest protocol")
               end
 
     if @security_level > MessageFlags::None
-      raise "auth password must have between 8 to 32 characters" unless (8..32).covers?(@auth_password.size)
+      raise ArgumentError.new("auth password must have between 8 to 32 characters") unless (8..32).covers?(@auth_password.size)
       @auth_pass_key = passkey(@auth_password)
     end
 
     if @security_level == (MessageFlags::Authentication | MessageFlags::Privacy)
-      raise "priv password must have between 8 to 32 characters" unless (8..32).covers?(@priv_password.size)
+      raise ArgumentError.new("priv password must have between 8 to 32 characters") unless (8..32).covers?(@priv_password.size)
       @priv_pass_key = passkey(@priv_password)
+    end
+  end
+
+  # The default message security model
+  def security_model : SecurityModel
+    if @security_level == MessageFlags::Privacy
+      SecurityModel::User
+    else
+      SecurityModel::Transport
     end
   end
 
@@ -179,7 +191,7 @@ class SNMP::V3::Security
               when PrivacyProtocol::AES
                 AES.new(priv_key)
               else
-                raise "unknown privacy protocol"
+                raise Security::Error.new("unknown privacy protocol")
               end
     @encryption = crypt
   end

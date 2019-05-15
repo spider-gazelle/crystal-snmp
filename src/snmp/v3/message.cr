@@ -22,18 +22,25 @@ class SNMP::V3::Message < SNMP::Message
     @security_params = SecurityParams.new(snmp[2])
 
     # This data is encrypted if response is an OctetString
-    if snmp[3].tag == UniversalTags::Sequence
-      @scoped_pdu = ScopedPDU.new(snmp[3])
-    elsif security
+    if security
       @scoped_pdu = if @flags.privacy?
                       ber = security.decode(snmp[3], @security_params.priv_param, @security_params.engine_time, @security_params.engine_boots)
-                      ScopedPDU.new(ber)
+                      begin
+                        ScopedPDU.new(ber)
+                      rescue error
+                        e = Security::Error.new("PDU decryption error. Possibly incorrect security details\n#{error.message}")
+                        e.callstack = error.callstack
+                        raise e
+                      end
                     else
                       ScopedPDU.new(snmp[3])
                     end
       verify(security, snmp[3]) if @flags.authentication?
+    elsif snmp[3].tag == UniversalTags::Sequence
+      # This will read authenticated requests even if we don't have security details
+      @scoped_pdu = ScopedPDU.new(snmp[3])
     else
-      raise "session security required to decode PDU"
+      raise Security::Error.new("session security required to decode PDU")
     end
 
     # For compatibility with SNMPv2 Message class
@@ -54,6 +61,10 @@ class SNMP::V3::Message < SNMP::Message
     @community = @security_params.engine_id
     @request = @scoped_pdu.request
     @pdu = @scoped_pdu.pdu
+  end
+
+  def self.new(snmp = ASN1::BER, security : Security? = nil)
+    V3::Message.new(snmp.children, security)
   end
 
   property id : Int32

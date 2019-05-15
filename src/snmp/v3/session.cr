@@ -18,6 +18,7 @@ class SNMP::V3::Session
     @engine_time = 0
   end
 
+  getter security : V3::Security
   getter engine_id : String
   getter timeliness : Int64 = 0_i64
   getter session_created : Int64 = 0_i64
@@ -50,6 +51,12 @@ class SNMP::V3::Session
     @engine_time = message.security_params.engine_time
     @timeliness = Time.monotonic.to_i
     self
+  end
+
+  def validate(message : ASN1::BER)
+    # NOTE:: We don't pass in security here as we are probing for the engine ID
+    probe = V3::Message.new(message.children, nil)
+    validate probe
   end
 
   def prepare(message : V3::Message) : ASN1::BER
@@ -85,5 +92,22 @@ class SNMP::V3::Session
 
   def update_time
     @engine_time = (Time.monotonic.to_i - @session_created).to_i
+  end
+
+  def get(oid, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
+    pdu = PDU.new(request_id, VarBind.new(oid))
+    pdu.varbinds[0].value.tag_number = UniversalTags::Null
+    scoped_pdu = ScopedPDU.new(Request::Get, pdu, @engine_id)
+    sec_params = SecurityParams.new(@security.username, @engine_id, @engine_boots, @engine_time)
+
+    message = V3::Message.new(scoped_pdu, sec_params, @security, security_model, message_id)
+    message.request = Request::Get
+    message
+  end
+
+  def get_next(oid, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
+    message = get(oid, request_id, message_id, security_model)
+    message.request = Request::GetNext
+    message
   end
 end

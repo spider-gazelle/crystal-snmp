@@ -49,6 +49,16 @@ class SNMP::Message
     {Request::Get, Request::GetNext, Request::Set, Request::GetBulk, Request::Inform}.includes? @request
   end
 
+  # shortcut for `.varbinds[0].oid`
+  def oid
+    self.varbinds[0].oid
+  end
+
+  # shortcut for `.varbinds[0].value`
+  def value
+    self.varbinds[0].value
+  end
+
   # Builds a response object based on the current request
   def build_reply
     self.class.new(@version, @community, Request::Response, @pdu.request_id)
