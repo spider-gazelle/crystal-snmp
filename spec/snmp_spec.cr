@@ -338,4 +338,20 @@ describe SNMP do
     response = session.parse(socket.read_bytes(ASN1::BER))
     response.value.get_string.should eq("SNMP Laboratories, info@snmplabs.com")
   end
+
+  it "should be able to query SNMPLabs with SNMPv2" do
+    # Connect to server
+    socket = UDPSocket.new
+    socket.connect("demo.snmplabs.com", 161)
+    socket.sync = false
+
+    # Make request
+    session = SNMP::Session.new
+    socket.write_bytes session.get("1.3.6.1.2.1.1.4.0")
+    socket.flush
+
+    # Process response
+    response = session.parse(socket.read_bytes(ASN1::BER))
+    response.value.get_string.should eq("SNMP Laboratories, info@snmplabs.com")
+  end
 end

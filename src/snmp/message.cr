@@ -20,8 +20,8 @@ class SNMP::Message
     end
   end
 
-  def initialize(@version, @community, @request, request_id = 0, error_status = ErrorStatus::NoError, error_index = 0)
-    @pdu = PDU.new(request_id, error_status, error_index)
+  def initialize(@community, @request, varbind : VarBind? | Array(VarBind) = nil, request_id = rand(2147483647), error_status = ErrorStatus::NoError, error_index = 0, @version = Version::V2C)
+    @pdu = PDU.new(request_id, varbind, error_status, error_index)
   end
 
   getter pdu : PDU | Trap | V1Trap
@@ -51,28 +51,21 @@ class SNMP::Message
 
   # shortcut for `.varbinds[0].oid`
   def oid
-    self.varbinds[0].oid
+    @pdu.oid
   end
 
   # shortcut for `.varbinds[0].value`
   def value
-    self.varbinds[0].value
+    @pdu.value
   end
 
   # Builds a response object based on the current request
   def build_reply
-    self.class.new(@version, @community, Request::Response, @pdu.request_id)
+    self.class.new(@community, Request::Response, request_id: @pdu.request_id, version: @version)
   end
 
   def new_request_id
     @pdu.new_request_id
-  end
-
-  def get(oid)
-    self.pdu = PDU.new(varbinds: [VarBind.new(oid)])
-    self.pdu.varbinds[0].value.tag_number = UniversalTags::Null
-    self.request = Request::Get
-    self
   end
 
   def to_ber(pdu = @pdu.to_ber(@request.to_u8))

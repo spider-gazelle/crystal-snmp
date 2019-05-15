@@ -108,5 +108,6 @@ class SNMP
 end
 
 require "./snmp/message"
+require "./snmp/session"
 require "./snmp/v3/message"
 require "./snmp/v3/session"

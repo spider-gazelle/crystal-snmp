@@ -5,8 +5,9 @@ class SNMP::VarBind
     @value = varbind[1]
   end
 
-  def initialize(@oid)
+  def initialize(@oid, tag_number = UniversalTags::Null)
     @value = ASN1::BER.new
+    @value.tag_number = tag_number
   end
 
   property oid : String

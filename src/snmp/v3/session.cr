@@ -39,7 +39,7 @@ class SNMP::V3::Session
     (Time.monotonic.to_i - @timeliness) >= TIMELINESS_THRESHOLD
   end
 
-  def engine_validation_probe
+  def engine_validation_probe : V3::Message
     security_params = SecurityParams.new
     scoped_pdu = ScopedPDU.new(SNMP::Request::Get, SNMP::PDU.new)
     V3::Message.new(scoped_pdu, security_params, security_model: SecurityModel::Transport)
@@ -57,6 +57,17 @@ class SNMP::V3::Session
     # NOTE:: We don't pass in security here as we are probing for the engine ID
     probe = V3::Message.new(message.children, nil)
     validate probe
+  end
+
+  # Note:: only used when being queried
+  def reboot
+    @engine_boots += 1
+    @engine_time = 0
+    @session_created = Time.monotonic.to_i
+  end
+
+  def update_time
+    @engine_time = (Time.monotonic.to_i - @session_created).to_i
   end
 
   def prepare(message : V3::Message) : ASN1::BER
@@ -78,25 +89,13 @@ class SNMP::V3::Session
     snmp = message.children
     version = Version.from_value(snmp[0].get_integer)
 
-    raise "SNMP version mismatch" unless version == Version::V3
+    raise "SNMP version mismatch, expected V3 got #{version}" unless version == Version::V3
 
     V3::Message.new(snmp, security)
   end
 
-  # Note:: only used when being queried
-  def reboot
-    @engine_boots += 1
-    @engine_time = 0
-    @session_created = Time.monotonic.to_i
-  end
-
-  def update_time
-    @engine_time = (Time.monotonic.to_i - @session_created).to_i
-  end
-
   def get(oid, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
     pdu = PDU.new(request_id, VarBind.new(oid))
-    pdu.varbinds[0].value.tag_number = UniversalTags::Null
     scoped_pdu = ScopedPDU.new(Request::Get, pdu, @engine_id)
     sec_params = SecurityParams.new(@security.username, @engine_id, @engine_boots, @engine_time)
 

@@ -29,6 +29,16 @@ class SNMP::PDU
     @request_id = rand(2147483647)
   end
 
+  # shortcut for `.varbinds[0].oid`
+  def oid
+    @varbinds[0].oid
+  end
+
+  # shortcut for `.varbinds[0].value`
+  def value
+    @varbinds[0].value
+  end
+
   def to_ber(tag_number)
     req = ASN1::BER.new
     req.set_integer(@request_id)
