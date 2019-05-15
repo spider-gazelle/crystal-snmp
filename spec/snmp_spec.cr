@@ -172,7 +172,7 @@ describe SNMP do
     # Test decoding of serialised message
     io.rewind
     test = io.read_bytes(ASN1::BER)
-    snmp = SNMP::V3::Message.new(test.children, security)
+    SNMP::V3::Message.new(test.children, security)
   end
 
   it "should be able to decrypt a SHA1 with DES request" do
@@ -211,7 +211,7 @@ describe SNMP do
     io.rewind
     test = io.read_bytes(ASN1::BER)
 
-    snmp = SNMP::V3::Message.new(test.children, security)
+    SNMP::V3::Message.new(test.children, security)
   end
 
   it "should be able to decrypt a MD5 with AES request" do
