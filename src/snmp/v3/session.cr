@@ -118,9 +118,9 @@ class SNMP::V3::Session
       data.value.set_string(value)
     when Int
       data.value.set_integer(value)
-    # TODO::
-    #when Float
-    #when Socket::IPAddress
+      # TODO::
+      # when Float
+      # when Socket::IPAddress
     when Bool
       data.value.set_boolean(value)
     when Nil

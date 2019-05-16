@@ -358,7 +358,7 @@ describe SNMP do
   it "should be able to set an OID on SNMPLabs with SNMPv2" do
     # Connect to server
     socket = UDPSocket.new
-    #socket.connect("localhost", 32771)
+    # socket.connect("localhost", 32771)
     socket.connect("demo.snmplabs.com", 161)
     socket.sync = false
 
