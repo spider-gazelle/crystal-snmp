@@ -51,4 +51,31 @@ class SNMP::Session
     message.request = Request::GetNext
     message
   end
+
+  # TODO:: requires better support for SNMP values such as Counter32, Counter64, Gauge32, OID, Timeticks etc
+  def set(oid, value, request_id = rand(2147483647))
+    data = value.is_a?(VarBind) ? value : VarBind.new(oid)
+
+    case value
+    when String
+      data.value.set_string(value)
+    when Int
+      data.value.set_integer(value)
+    # TODO::
+    #when Float
+    #when Socket::IPAddress
+    when Bool
+      data.value.set_boolean(value)
+    when Nil
+      data.value.tag_number = UniversalTags::Null
+    when ASN1::BER
+      data.value = value
+    when VarBind
+      data.oid = oid
+    else
+      raise "unsupported varbind value. For complex values pass a pre-constructed `ASN1::BER`"
+    end
+
+    SNMP::Message.new(@community, Request::Set, data, request_id)
+  end
 end

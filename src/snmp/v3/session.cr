@@ -1,5 +1,5 @@
 class SNMP::V3::Session
-  def initialize(username = "", auth_password = "", priv_password = "", @engine_id = "", auth_protocol = Security::AuthProtocol::MD5, priv_protocol = Security::PrivacyProtocol::DES)
+  def initialize(username, auth_password = "", priv_password = "", @engine_id = "", auth_protocol = Security::AuthProtocol::MD5, priv_protocol = Security::PrivacyProtocol::DES)
     @engine_boots = 0
     @engine_time = 0
 
@@ -13,7 +13,8 @@ class SNMP::V3::Session
     )
   end
 
-  def initialize(@security : V3::Security, @engine_id = "")
+  def initialize(@security : V3::Security)
+    @engine_id = @security.engine_id
     @engine_boots = 0
     @engine_time = 0
   end
@@ -99,14 +100,43 @@ class SNMP::V3::Session
     scoped_pdu = ScopedPDU.new(Request::Get, pdu, @engine_id)
     sec_params = SecurityParams.new(@security.username, @engine_id, @engine_boots, @engine_time)
 
-    message = V3::Message.new(scoped_pdu, sec_params, @security, security_model, message_id)
-    message.request = Request::Get
-    message
+    V3::Message.new(scoped_pdu, sec_params, @security, security_model, message_id)
   end
 
   def get_next(oid, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
     message = get(oid, request_id, message_id, security_model)
     message.request = Request::GetNext
     message
+  end
+
+  # TODO:: requires better support for SNMP values such as Counter32, Counter64, Gauge32, OID, Timeticks etc
+  def set(oid, value, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
+    data = value.is_a?(VarBind) ? value : VarBind.new(oid)
+
+    case value
+    when String
+      data.value.set_string(value)
+    when Int
+      data.value.set_integer(value)
+    # TODO::
+    #when Float
+    #when Socket::IPAddress
+    when Bool
+      data.value.set_boolean(value)
+    when Nil
+      data.value.tag_number = UniversalTags::Null
+    when ASN1::BER
+      data.value = value
+    when VarBind
+      data.oid = oid
+    else
+      raise "unsupported varbind value. For complex values pass a pre-constructed `ASN1::BER`"
+    end
+
+    pdu = PDU.new(request_id, data)
+    scoped_pdu = ScopedPDU.new(Request::Set, pdu, @engine_id)
+    sec_params = SecurityParams.new(@security.username, @engine_id, @engine_boots, @engine_time)
+
+    V3::Message.new(scoped_pdu, sec_params, @security, security_model, message_id)
   end
 end

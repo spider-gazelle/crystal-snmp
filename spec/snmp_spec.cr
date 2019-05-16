@@ -354,4 +354,27 @@ describe SNMP do
     response = session.parse(socket.read_bytes(ASN1::BER))
     response.value.get_string.should eq("SNMP Laboratories, info@snmplabs.com")
   end
+
+  it "should be able to set an OID on SNMPLabs with SNMPv2" do
+    # Connect to server
+    socket = UDPSocket.new
+    #socket.connect("localhost", 32771)
+    socket.connect("demo.snmplabs.com", 161)
+    socket.sync = false
+
+    # Make request
+    session = SNMP::Session.new("public")
+    socket.write_bytes session.set("1.3.6.1.2.1.1.3.0.0.0.0", 43)
+    socket.flush
+
+    # Process response
+    response = session.parse(socket.read_bytes(ASN1::BER))
+    response.request.should eq(SNMP::Request::Response)
+
+    # Response should be: No Such Instance currently exists at this OID
+    response.pdu.error_status.should eq(SNMP::ErrorStatus::NoError)
+    response.pdu.error_index.should eq(SNMP::ErrorIndex::NoError)
+    response.value.tag_class.should eq(ASN1::BER::TagClass::ContextSpecific)
+    response.value.tag_number.should eq(1)
+  end
 end

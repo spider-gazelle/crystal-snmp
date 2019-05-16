@@ -63,6 +63,12 @@ class SNMP
 
   enum ErrorStatus
     NoError
+    RemoteError
+    InternalError
+  end
+
+  enum ErrorIndex
+    NoError
     TooBig
     NoSuchName
     BadValue

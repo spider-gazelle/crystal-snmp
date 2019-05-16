@@ -20,7 +20,7 @@ class SNMP::Message
     end
   end
 
-  def initialize(@community, @request, varbind : VarBind? | Array(VarBind) = nil, request_id = rand(2147483647), error_status = ErrorStatus::NoError, error_index = 0, @version = Version::V2C)
+  def initialize(@community, @request, varbind : VarBind? | Array(VarBind) = nil, request_id = rand(2147483647), error_status = ErrorStatus::NoError, error_index = ErrorIndex::NoError, @version = Version::V2C)
     @pdu = PDU.new(request_id, varbind, error_status, error_index)
   end
 
