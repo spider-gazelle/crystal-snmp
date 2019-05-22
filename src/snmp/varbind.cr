@@ -33,4 +33,9 @@ class SNMP::VarBind
       self
     end
   {% end %}
+
+  # Proxy missing methods to the BER value
+  macro method_missing(call)
+    self.value.{{call.name.id}}({{*call.args}})
+  end
 end
