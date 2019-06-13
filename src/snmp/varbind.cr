@@ -29,7 +29,7 @@ class SNMP::VarBind
     end
 
     def set_{{helpers.id}}(data)
-      SNMP.set_{{helpers.id}}(self.value, data)
+      SNMP.set_{{helpers.id}}(data, self.value)
       self
     end
   {% end %}
