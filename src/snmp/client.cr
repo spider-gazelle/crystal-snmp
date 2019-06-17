@@ -76,4 +76,20 @@ class SNMP::Client
     end
     messages
   end
+
+  def walk(oid : String)
+    with_socket do |sock|
+      msg = get_next(oid, sock)
+
+      # While the message is not nil and the returned oid is a child of the request
+      while (!msg.nil? && msg.oid.includes?(oid))
+        # Break at END OF MIB
+        break if msg.value.payload.empty?
+
+        yield msg
+        msg = get_next(msg.oid, sock)
+      end
+    end
+    self
+  end
 end
