@@ -171,7 +171,7 @@ class SNMP::V3::Security
     while password_index < 1048576
       initial = password_index % password_length
       rotated = password[initial..-1] + password[0, initial]
-      buffer = rotated * (64 / rotated.size) + rotated[0, 64 % rotated.size]
+      buffer = rotated * (64 // rotated.size) + rotated[0, 64 % rotated.size]
       password_index += 64
       @digest << buffer
     end
