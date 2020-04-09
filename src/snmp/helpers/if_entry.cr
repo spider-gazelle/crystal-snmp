@@ -47,6 +47,9 @@ class SNMP
           @out_errors = varbind.get_unsigned32
         when "1.3.6.1.2.1.2.2.1.21"
           @out_qlen = varbind.get_unsigned32
+        else
+          # We are not sure what this entry is
+          # safe to ignore
         end
       end
     end
