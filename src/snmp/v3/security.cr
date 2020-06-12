@@ -129,7 +129,7 @@ class SNMP::V3::Security
 
     @digest.reset
     @digest << io.to_slice
-    d1 = @digest.digest
+    d1 = @digest.final
 
     io = IO::Memory.new
     io.write k2
@@ -137,7 +137,7 @@ class SNMP::V3::Security
 
     @digest.reset
     @digest << io.to_slice
-    @digest.digest[0, 12]
+    @digest.final[0, 12]
   end
 
   @auth_key : Bytes = Bytes.new(0)
@@ -160,7 +160,7 @@ class SNMP::V3::Security
     @digest << @engine_id.hexbytes
     @digest << key
 
-    @digest.digest
+    @digest.final
   end
 
   def passkey(password)
@@ -176,7 +176,7 @@ class SNMP::V3::Security
       @digest << buffer
     end
 
-    dig = @digest.digest
+    dig = @digest.final
     dig = dig[0, 16] if @auth_protocol == AuthProtocol::MD5
     dig
   end
