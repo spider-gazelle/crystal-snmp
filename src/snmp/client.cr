@@ -6,7 +6,7 @@ class SNMP::Client
   end
 
   getter socket : UDPSocket
-  getter session : SNMP::Session
+  getter session : SNMP::Session | SNMP::V3::Session
   getter host, timeout, port
 
   def initialize(@host : String, community = "public", @timeout = 3, @port = 161)
@@ -14,6 +14,12 @@ class SNMP::Client
     socket.sync = false
     socket.read_timeout = timeout
     @session = SNMP::Session.new(community: community)
+  end
+
+  def initialize(@host : String, @session : SNMP::Session | SNMP::V3::Session, @timeout = 3, @port = 161)
+    @socket = UDPSocket.new
+    socket.sync = false
+    socket.read_timeout = timeout
   end
 
   private def with_socket
@@ -38,7 +44,12 @@ class SNMP::Client
   end
 
   private def get(oid : String, sock : UDPSocket) : SNMP::Message
-    sock.write_bytes session.get(oid)
+    check_validation_probe(sock)
+
+    message = session.get(oid)
+    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
+
+    sock.write_bytes message
     sock.flush
     session.parse(sock.read_bytes(ASN1::BER))
   end
@@ -55,7 +66,12 @@ class SNMP::Client
   end
 
   private def get_next(oid : String, sock : UDPSocket) : SNMP::Message
-    sock.write_bytes session.get_next(oid)
+    check_validation_probe(sock)
+
+    message = session.get_next(oid)
+    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
+
+    sock.write_bytes message
     sock.flush
     session.parse(sock.read_bytes(ASN1::BER))
   end
@@ -91,5 +107,13 @@ class SNMP::Client
       end
     end
     self
+  end
+
+  protected def check_validation_probe(sock)
+    if session.must_revalidate?
+      sock.write_bytes session.engine_validation_probe
+      sock.flush
+      session.validate sock.read_bytes(ASN1::BER)
+    end
   end
 end
