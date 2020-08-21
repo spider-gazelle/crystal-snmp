@@ -35,7 +35,7 @@ class SNMP::V3::Message < SNMP::Message
                     else
                       ScopedPDU.new(snmp[3])
                     end
-      verify(security, snmp[3]) if @flags.authentication?
+      verify(security, snmp[3]) if security.verify_messages && @flags.authentication?
     elsif snmp[3].tag == UniversalTags::Sequence
       # This will read authenticated requests even if we don't have security details
       @scoped_pdu = ScopedPDU.new(snmp[3])
