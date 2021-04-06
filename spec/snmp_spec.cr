@@ -268,6 +268,8 @@ describe SNMP do
   end
 
   it "should be able to query SNMPLabs with MD5 auth" do
+    pending!("need a replacement for snmpsim https://github.com/inexio/snmpsim")
+
     # Connect to server
     socket = UDPSocket.new
     socket.connect("demo.snmplabs.com", 161)
@@ -293,6 +295,8 @@ describe SNMP do
   end
 
   it "should be able to query SNMPLabs with MD5 and AES auth" do
+    pending!("need a replacement for snmpsim https://github.com/inexio/snmpsim")
+
     # Connect to server
     socket = UDPSocket.new
     socket.connect("demo.snmplabs.com", 161)
@@ -318,6 +322,8 @@ describe SNMP do
   end
 
   it "should be able to query SNMPLabs with MD5 and DES auth" do
+    pending!("need a replacement for snmpsim https://github.com/inexio/snmpsim")
+
     # Connect to server
     socket = UDPSocket.new
     socket.connect("demo.snmplabs.com", 161)
@@ -345,7 +351,7 @@ describe SNMP do
   it "should be able to query SNMPLabs with SNMPv2" do
     # Connect to server
     socket = UDPSocket.new
-    socket.connect("demo.snmplabs.com", 161)
+    socket.connect("localhost", 4000)
     socket.sync = false
     socket.read_timeout = 3
 
@@ -356,10 +362,12 @@ describe SNMP do
 
     # Process response
     response = session.parse(socket.read_bytes(ASN1::BER))
-    response.value.get_string.should eq("SNMP Laboratories, info@snmplabs.com")
+    response.value.get_string.should start_with("Root <root@localhost>")
   end
 
   it "should be able to set an OID on SNMPLabs with SNMPv2" do
+    pending!("need a replacement for snmpsim https://github.com/inexio/snmpsim")
+
     # Connect to server
     socket = UDPSocket.new
     # socket.connect("localhost", 32771)
