@@ -1,6 +1,6 @@
 # SNMP Support for Crystal Lang
 
-[![Build Status](https://travis-ci.org/spider-gazelle/crystal-snmp.svg?branch=master)](https://travis-ci.org/spider-gazelle/crystal-snmp)
+[![CI](https://github.com/spider-gazelle/crystal-snmp/actions/workflows/ci.yml/badge.svg)](https://github.com/spider-gazelle/crystal-snmp/actions/workflows/ci.yml)
 
 NOTE:: I consider the project ready to use. Usage won't change significantly between now and v1.0.0
 

@@ -1,8 +1,0 @@
-language: crystal
-install:
-  - shards install
-  - docker pull polinux/snmpd
-  - docker run -d -p 4000:161/udp polinux/snmpd
-  - sleep 5
-script:
-  - crystal spec --warnings=all --error-trace
