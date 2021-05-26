@@ -1,6 +1,7 @@
 # https://www.alvestrand.no/objectid/1.3.6.1.2.1.2.2.1.html
 class SNMP
   class Helpers::IfEntry
+    # ameba:disable Metrics/CyclomaticComplexity
     def initialize(pdu : SNMP::PDU)
       pdu.varbinds.each do |varbind|
         # As the OID includes the IfIndex - i.e. "1.3.6.1.2.1.2.2.1.1.26"
