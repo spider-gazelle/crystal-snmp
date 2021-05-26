@@ -351,7 +351,7 @@ describe SNMP do
   it "should be able to query SNMPLabs with SNMPv2" do
     # Connect to server
     socket = UDPSocket.new
-    socket.connect("localhost", 4000)
+    socket.connect(TEST_SNMP_SERVER, 4000)
     socket.sync = false
     socket.read_timeout = 3
 

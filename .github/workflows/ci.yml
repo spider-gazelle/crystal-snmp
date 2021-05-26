@@ -17,6 +17,15 @@ jobs:
           - 1.0.0
     runs-on: ${{ matrix.os }}
     container: crystallang/crystal:${{ matrix.crystal }}-alpine
+
+    services:
+      # Label used to access the service container
+      snmpd:
+        # Docker Hub image
+        image: polinux/snmpd
+        options: >-
+          -p 4000:161/udp
+
     steps:
     - uses: actions/checkout@v2
     - name: Install dependencies
@@ -27,3 +36,5 @@ jobs:
       run: crystal tool format --check
     - name: Run tests
       run: crystal spec -v --error-trace
+      env:
+        TEST_SNMP_SERVER: snmpd
