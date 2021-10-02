@@ -1,5 +1,58 @@
 # https://www.alvestrand.no/objectid/1.3.6.1.2.1.2.2.1.html
 class SNMP
+  # http://www.net-snmp.org/docs/mibs/interfaces.html#ifAdminStatus
+  enum IfAdminStatus
+    Up      = 1
+    Down
+    Testing
+  end
+
+  enum IfOperStatus
+    Up             = 1
+    Down
+    Testing
+    Unknown
+    Dormant
+    NotPresent
+    LowerLayerDown
+  end
+
+  # https://www.alvestrand.no/objectid/1.3.6.1.2.1.2.2.1.3.html
+  enum IfType
+    Other                  = 1
+    Regular1822
+    HDH1822
+    DDNx25
+    RFC877x25
+    EthernetCSMACD
+    ISO88023CSMACD
+    ISO88024TokenBus
+    ISO88025TokenRing
+    ISO88026Man
+    StarLan
+    Proteon10Mbit
+    Proteon80Mbit
+    HyperChannel
+    FDDI
+    LAPB
+    SDLC
+    DSL
+    EL
+    BasicISDN
+    PrimaryISDN
+    PropPointToPointSerial
+    PPP
+    SoftwareLoopback
+    EON
+    Ethernet3Mbit
+    NSIP
+    SLIP
+    Ultra
+    DS3
+    SIP
+    FrameRelay
+  end
+
   class Helpers::IfEntry
     # ameba:disable Metrics/CyclomaticComplexity
     def initialize(pdu : SNMP::PDU)
@@ -76,58 +129,5 @@ class SNMP
     property out_discards = 0_u32
     property out_errors = 0_u32
     property out_qlen = 0_u32
-  end
-
-  # http://www.net-snmp.org/docs/mibs/interfaces.html#ifAdminStatus
-  enum IfAdminStatus
-    Up      = 1
-    Down
-    Testing
-  end
-
-  enum IfOperStatus
-    Up             = 1
-    Down
-    Testing
-    Unknown
-    Dormant
-    NotPresent
-    LowerLayerDown
-  end
-
-  # https://www.alvestrand.no/objectid/1.3.6.1.2.1.2.2.1.3.html
-  enum IfType
-    Other                  = 1
-    Regular1822
-    HDH1822
-    DDNx25
-    RFC877x25
-    EthernetCSMACD
-    ISO88023CSMACD
-    ISO88024TokenBus
-    ISO88025TokenRing
-    ISO88026Man
-    StarLan
-    Proteon10Mbit
-    Proteon80Mbit
-    HyperChannel
-    FDDI
-    LAPB
-    SDLC
-    DSL
-    EL
-    BasicISDN
-    PrimaryISDN
-    PropPointToPointSerial
-    PPP
-    SoftwareLoopback
-    EON
-    Ethernet3Mbit
-    NSIP
-    SLIP
-    Ultra
-    DS3
-    SIP
-    FrameRelay
   end
 end
