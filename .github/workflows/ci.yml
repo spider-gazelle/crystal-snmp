@@ -22,9 +22,10 @@ jobs:
       # Label used to access the service container
       snmpd:
         # Docker Hub image
-        image: polinux/snmpd
-        options: >-
-          -p 4000:161/udp
+        image: tandrup/snmpsim
+        # Not sure how to configure this correctly...
+        # env:
+        #   EXTRA_FLAGS="--v3-user=usr-md5-none --v3-auth-key=authkey1 --v3-auth-proto=MD5"
 
     steps:
     - uses: actions/checkout@v2
