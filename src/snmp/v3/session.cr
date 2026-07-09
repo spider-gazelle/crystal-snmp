@@ -43,7 +43,7 @@ class SNMP::V3::Session
   def engine_validation_probe : V3::Message
     security_params = SecurityParams.new
     scoped_pdu = ScopedPDU.new(SNMP::Request::Get, SNMP::PDU.new)
-    V3::Message.new(scoped_pdu, security_params, security_model: SecurityModel::Transport)
+    V3::Message.new(scoped_pdu, security_params, security_model: SecurityModel::USM)
   end
 
   def validate(message : V3::Message)

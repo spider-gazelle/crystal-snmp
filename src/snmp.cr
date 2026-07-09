@@ -20,15 +20,17 @@ class SNMP
       Reportable
     end
 
+    # IANA SnmpSecurityModel numbers (RFC 3411).
+    #
+    # For USM, the "authoritative" engine rules apply: when a message expects a
+    # response (Get, GetNext, GetBulk, Set, or Inform) the receiver is authoritative;
+    # when it does not (SNMPv2-Trap, Response, or Report) the sender is authoritative.
     enum SecurityModel
-      # Any = 0
-      SNMPv1
-      SNMPv2
-
-      # When an SNMP message contains a payload that expects a response (for example, a Get, GetNext, GetBulk, Set, or Inform PDU), then the receiver of such messages is authoritative.
-      # When an SNMP message contains a payload that does not expect a response (for example, an SNMPv2-Trap, Response, or Report PDU), then the sender of such a message is authoritative.
-      User
-      Transport # DTLS
+      Any     = 0
+      SNMPv1  = 1
+      SNMPv2c = 2
+      USM     = 3
+      TSM     = 4 # Transport Security Model (DTLS)
     end
   end
 

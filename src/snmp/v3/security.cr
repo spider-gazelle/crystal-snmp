@@ -70,13 +70,9 @@ class SNMP::V3::Security
     end
   end
 
-  # The default message security model
+  # This class implements the User-based Security Model.
   def security_model : SecurityModel
-    if @security_level == MessageFlags::Privacy
-      SecurityModel::User
-    else
-      SecurityModel::Transport
-    end
+    SecurityModel::USM
   end
 
   def encode(pdu : ASN1::BER, engine_time, engine_boots)
