@@ -384,7 +384,7 @@ describe SNMP do
 
     # Response should be: No Such Instance currently exists at this OID
     response.pdu.error_status.should eq(SNMP::ErrorStatus::NoError)
-    response.pdu.error_index.should eq(SNMP::ErrorIndex::NoError)
+    response.pdu.error_index.should eq(0)
     response.value.tag_class.should eq(ASN1::BER::TagClass::ContextSpecific)
     response.value.tag_number.should eq(1)
   end

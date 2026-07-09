@@ -61,13 +61,9 @@ class SNMP
     EnterpriseSpecific
   end
 
+  # PDU error-status codes (RFC 3416). error-index is a plain 1-based varbind
+  # position, not an enum — see `PDU#error_index`.
   enum ErrorStatus
-    NoError
-    RemoteError
-    InternalError
-  end
-
-  enum ErrorIndex
     NoError
     TooBig
     NoSuchName

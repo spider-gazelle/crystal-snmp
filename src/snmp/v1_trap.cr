@@ -14,7 +14,7 @@ class SNMP::V1Trap < SNMP::Trap
     # V1 traps are very different: https://tools.ietf.org/html/rfc1157#page-27
     @request_id = 0
     @error_status = ErrorStatus::NoError
-    @error_index = ErrorIndex::NoError
+    @error_index = 0
   end
 
   property agent_address : String
