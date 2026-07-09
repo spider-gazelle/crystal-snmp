@@ -1,0 +1,52 @@
+[tools]
+crystal = "1.20.2"
+
+[vars]
+# Add --verbose only in an interactive terminal (TTY check)
+SPEC_OPTS = "{% if exec(command='(tty -s && echo true) || echo false') == 'true' %}--verbose{% endif %}"
+
+[tasks."dev:deps"]
+description = "Install dependencies (also builds bin/ameba)"
+run = "shards install"
+
+[tasks."dev:format"]
+description = "Format the source"
+run = "crystal tool format src/ spec/"
+
+[tasks."dev:format-check"]
+description = "Check formatting"
+run = "crystal tool format --check"
+
+[tasks."dev:ameba"]
+description = "Run static code analysis"
+run = "bin/ameba"
+
+[tasks."dev:spec"]
+description = "Run the deterministic spec suite (excludes e2e / legacy)"
+run = "crystal spec --error-trace --tag '~e2e' --tag '~legacy' {{vars.SPEC_OPTS}}"
+
+[tasks."dev:spec-e2e"]
+description = "Run the live spec suite against a real SNMP server (set TEST_SNMP_SERVER)"
+run = "crystal spec --error-trace --tag e2e {{vars.SPEC_OPTS}}"
+
+[tasks."dev:spec-legacy"]
+description = "Run specs needing OpenSSL legacy algorithms (DES) — requires the legacy provider"
+run = "crystal spec --error-trace --tag legacy {{vars.SPEC_OPTS}}"
+
+[tasks."dev:spec-mt"]
+description = "Run the deterministic spec suite multi-threaded (fiber-safety gate)"
+run = "crystal spec --error-trace -Dpreview_mt --tag '~e2e' --tag '~legacy' {{vars.SPEC_OPTS}}"
+env = { CRYSTAL_WORKERS = "4" }
+
+[tasks."dev:docs"]
+description = "Build the API docs (fails on doc-comment / compile errors)"
+run = "crystal docs"
+
+[tasks."dev:check"]
+description = "Format-check, lint and test in one shot"
+run = "mise dev:format-check && mise dev:ameba && mise dev:spec && mise dev:spec-mt"
+
+# TODO: remove me when https://github.com/crystal-lang/crystal/issues/16746 is fixed
+[tasks."dev:fix-shards-command"]
+description = "Fix missing shards command on macOS"
+run = "cp $HOME/.local/share/mise/installs/crystal/{{tools.crystal.version}}/embedded/bin/shards $HOME/.local/share/mise/installs/crystal/{{tools.crystal.version}}/bin/"

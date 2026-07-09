@@ -153,7 +153,7 @@ describe SNMP do
     new_sig.should eq(existing)
   end
 
-  it "should be able to decrypt a MD5 with DES request" do
+  it "should be able to decrypt a MD5 with DES request", tags: "legacy" do
     security = SNMP::V3::Security.new("pippo", "80001f888059dc486145a26322", auth_password: "pippoxxx", priv_password: "PIPPOxxx")
 
     data = "3082014a0201033011020430f6f3d5020300ffe304010302010304373035040d80001f888059dc486145a2632202010802020ab90405706970706f040cc366a119e2be15a84f16e29d0408000000087da0625b0481f8d0b44e7e473b4e1864ff7f47c39254b941c8029f76e4ce419da8bd8ea8258e17cb01163cd02bdd22990b38f82cf4d104c543a772131a55d9abca5cdd86c412d724f6fef89480409c52aeee84a6cd1e474196645398473f5b0b863ca1ce67b434bc95d46143eb82c7f1e1b05b90ddeec375b48afbb1e1a500bccdf788459d19403dc56459ecbe82b88e2bb42de019f963a789f50de993557f2e358d9ad26e4eb199cce54b6632d30ab87404c681e4f5115ec14cf2ca37e2e452834b41775850727570f3d85b7e1a6793268dd263442a8de6fb4a2cf70b50a9c6f636ce0736b343371c5d0692da9d19dc720d1bbf082c9f387e78d0b0432002"
@@ -175,7 +175,7 @@ describe SNMP do
     SNMP::V3::Message.new(test.children, security)
   end
 
-  it "should be able to decrypt a SHA1 with DES request" do
+  it "should be able to decrypt a SHA1 with DES request", tags: "legacy" do
     security = SNMP::V3::Security.new("pippo2", "80001f888059dc486145a26322", auth_protocol: SNMP::V3::Security::AuthProtocol::SHA, auth_password: "pippoxxx", priv_password: "PIPPOxxx")
 
     data = "3082014b02010330110204655e2122020300ffe304010302010304383036040d80001f888059dc486145a2632202010802020aba0406706970706f32040c55efd50ae247d453ead989270408000000087da062630481f8bde25443f63f33edd14424a9abff75e11c2f771985ce69689cae26ac4382f16f1743efaabcfc3c2fc3bd9c149ac2ee3f9d278bd9478d38b7d9fcb1ddf6bf6ed4ec51dd13c3d9e93c39b63c0a60f75d1ee6c8b470a8a0a1842b7bd408a065b71a97307dbbc5d6ae6ac51d52dce77de64b4afe7d54ccb6f5bd12f7a01d10c4e46c6dc26023d4c787a40f17daeca49ca26ce569ea1be3457e9a7457079382732a83cea8cd3eceff46745183c684a02c69288d1bb3d5d06b6f240c02d6cc81e9494a6922c1375fa9df926e45fcda76b5b3a7c7d280d7e98f46afa5cf174d359cf5d325a551d32133a6f6474f64b7c23a120a6f64815ea3c3e904"
@@ -267,7 +267,7 @@ describe SNMP do
     io.to_slice.hexstring.should eq(output)
   end
 
-  it "should be able to query SNMPLabs with MD5 auth" do
+  it "should be able to query SNMPLabs with MD5 auth", tags: "e2e" do
     pending!("not sure how to configure SNMPv3 on the simulator")
 
     # Connect to server
@@ -294,7 +294,7 @@ describe SNMP do
     response.value.get_string.should eq("SNMP Laboratories, info@snmplabs.com")
   end
 
-  it "should be able to query SNMPLabs with MD5 and AES auth" do
+  it "should be able to query SNMPLabs with MD5 and AES auth", tags: "e2e" do
     pending!("not sure how to configure SNMPv3 on the simulator")
 
     # Connect to server
@@ -321,7 +321,7 @@ describe SNMP do
     response.value.get_string.should eq("SNMP Laboratories, info@snmplabs.com")
   end
 
-  it "should be able to query SNMPLabs with MD5 and DES auth" do
+  it "should be able to query SNMPLabs with MD5 and DES auth", tags: "e2e" do
     pending!("not sure how to configure SNMPv3 on the simulator")
 
     # Connect to server
@@ -348,7 +348,7 @@ describe SNMP do
     response.value.get_string.should eq("SNMP Laboratories, info@snmplabs.com")
   end
 
-  it "should be able to query SNMPLabs with SNMPv2" do
+  it "should be able to query SNMPLabs with SNMPv2", tags: "e2e" do
     # Connect to server
     socket = UDPSocket.new
     socket.connect(TEST_SNMP_SERVER, 161)
@@ -365,7 +365,7 @@ describe SNMP do
     response.value.get_string.should start_with("SNMP Laboratories")
   end
 
-  it "should be able to set an OID on SNMPLabs with SNMPv2" do
+  it "should be able to set an OID on SNMPLabs with SNMPv2", tags: "e2e" do
     # Connect to server
     socket = UDPSocket.new
     # socket.connect("localhost", 32771)
