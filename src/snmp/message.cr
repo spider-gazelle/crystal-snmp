@@ -6,9 +6,10 @@ require "./data_types"
 
 class SNMP::Message
   def initialize(snmp : Array(ASN1::BER))
-    @version = Version.from_value(snmp[0].get_integer)
+    raise SNMP::ParseError.new("truncated SNMP message: expected at least 3 fields, got #{snmp.size}") if snmp.size < 3
+    @version = SNMP.decode_enum(Version, snmp[0].get_integer, "SNMP version")
     @community = snmp[1].get_string
-    @request = Request.from_value(snmp[2].tag_number)
+    @request = SNMP.decode_enum(Request, snmp[2].tag_number, "PDU request type")
 
     case @request
     when Request::V1_Trap

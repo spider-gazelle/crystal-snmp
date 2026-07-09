@@ -1,9 +1,9 @@
 class SNMP::V1Trap < SNMP::Trap
   def initialize(ber : ASN1::BER)
-    pdu = ber.children
+    pdu = SNMP.ber_fields(ber, 6, "v1 trap")
     @oid = pdu[0].get_object_id
     @agent_address = pdu[1].payload.join(".")
-    @generic_trap = GenericTrap.from_value(pdu[2].get_integer)
+    @generic_trap = SNMP.decode_enum(GenericTrap, pdu[2].get_integer, "generic-trap")
     @specific_trap = pdu[3].get_integer.to_i32
     @time_ticks = SNMP.get_unsigned32(pdu[4])
     @varbinds = pdu[5].children.map do |varbind|

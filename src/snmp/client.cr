@@ -43,7 +43,7 @@ class SNMP::Client
     rescue ex : BinData::ParseError
       # A read timeout surfaces here as a BinData::ParseError wrapping IO::TimeoutError
       raise SNMP::TimeoutError.new("no response from #{host}:#{port} within #{timeout}s", cause: ex) if timed_out?(ex)
-      raise ex
+      raise SNMP::ParseError.new("failed to decode SNMP response from #{host}:#{port}: #{ex.message}", cause: ex)
     ensure
       socket.close
     end
