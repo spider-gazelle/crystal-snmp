@@ -64,7 +64,9 @@ class SNMP
         when "1.3.6.1.2.1.2.2.1.2"
           @descr = varbind.get_string
         when "1.3.6.1.2.1.2.2.1.3"
-          @type = IfType.from_value(varbind.get_integer)
+          # The IANA ifType registry has hundreds of values; anything outside
+          # the enum falls back to Other rather than crashing the parse.
+          @type = IfType.from_value?(varbind.get_integer) || IfType::Other
         when "1.3.6.1.2.1.2.2.1.4"
           @mtu = varbind.get_integer
         when "1.3.6.1.2.1.2.2.1.5"

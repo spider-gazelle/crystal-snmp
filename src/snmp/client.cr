@@ -22,7 +22,14 @@ class SNMP::Client
     socket.read_timeout = timeout
   end
 
-  private def with_socket
+  # True when *oid* is the *base* subtree or a descendant of it. Compares OID
+  # arcs, not the raw string, so a sibling column (e.g. `.10`) that merely shares
+  # a string prefix with `.1` is not treated as a child.
+  def self.oid_within?(oid : String, base : String) : Bool
+    oid == base || oid.starts_with?("#{base}.")
+  end
+
+  private def with_socket(&)
     if socket.closed?
       @socket = UDPSocket.new
       socket.sync = false
@@ -82,7 +89,7 @@ class SNMP::Client
       msg = get_next(oid, sock)
 
       # While the message is not nil and the returned oid is a child of the request
-      while (!msg.nil? && msg.oid.includes?(oid))
+      while (!msg.nil? && self.class.oid_within?(msg.oid, oid))
         # Break at END OF MIB
         break if msg.value.payload.empty?
 
@@ -93,12 +100,12 @@ class SNMP::Client
     messages
   end
 
-  def walk(oid : String)
+  def walk(oid : String, &)
     with_socket do |sock|
       msg = get_next(oid, sock)
 
       # While the message is not nil and the returned oid is a child of the request
-      while (!msg.nil? && msg.oid.includes?(oid))
+      while (!msg.nil? && self.class.oid_within?(msg.oid, oid))
         # Break at END OF MIB
         break if msg.value.payload.empty?
 

@@ -15,4 +15,12 @@ describe SNMP::Helpers::IfEntry do
     ifentry.descr.should eq("GigabitEthernet1/0/19")
     ifentry.index.should eq(26)
   end
+
+  it "falls back to Other for an ifType outside the enum" do
+    # ieee80211 (71) is a valid IANA ifType but absent from the enum
+    vb = SNMP::VarBind.new("1.3.6.1.2.1.2.2.1.3.26")
+    vb.value.set_integer(71)
+    ifentry = SNMP::Helpers::IfEntry.new(SNMP::PDU.new(varbinds: [vb]))
+    ifentry.type.should eq(SNMP::IfType::Other)
+  end
 end

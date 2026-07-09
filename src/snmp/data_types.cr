@@ -2,6 +2,9 @@ class SNMP
   def self.get_unsigned64(ber : ASN1::BER) : UInt64
     io = IO::Memory.new(8)
     bytes = ber.payload
+    # A Counter64/Gauge value with the high bit set carries a leading 0x00 pad,
+    # yielding 9 content bytes; keep the low 8 significant bytes (big-endian).
+    bytes = bytes[bytes.size - 8, 8] if bytes.size > 8
     io.pos = 8 - bytes.size
     io.write(bytes)
     io.rewind
@@ -30,6 +33,9 @@ class SNMP
   def self.get_unsigned32(ber : ASN1::BER) : UInt32
     io = IO::Memory.new(4)
     bytes = ber.payload
+    # A Counter32/Gauge32 value with the high bit set carries a leading 0x00 pad,
+    # yielding 5 content bytes; keep the low 4 significant bytes (big-endian).
+    bytes = bytes[bytes.size - 4, 4] if bytes.size > 4
     io.pos = 4 - bytes.size
     io.write(bytes)
     io.rewind
