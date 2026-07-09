@@ -1,10 +1,11 @@
 name: snmp
 version: 0.9.8
-crystal: ">= 0.36.1"
+crystal: ">= 1.2.0"
 
 dependencies:
   bindata:
     github: spider-gazelle/bindata
+    branch: master
 
 development_dependencies:
   ameba:

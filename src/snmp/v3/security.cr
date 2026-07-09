@@ -36,7 +36,7 @@ class SNMP::V3::Security
     @auth_password = "",
     @priv_protocol = PrivacyProtocol::DES,
     @priv_password = "",
-    @verify_messages = true
+    @verify_messages = true,
   )
     @security_level = if !@priv_password.empty?
                         MessageFlags::Authentication | MessageFlags::Privacy
