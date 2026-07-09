@@ -107,7 +107,7 @@ class SNMP::Client
       msg = get_next(oid, sock)
 
       # While the message is not nil and the returned oid is a child of the request
-      while (!msg.nil? && self.class.oid_within?(msg.oid, oid))
+      while !msg.nil? && self.class.oid_within?(msg.oid, oid)
         # Break at END OF MIB
         break if msg.value.payload.empty?
 
@@ -123,7 +123,7 @@ class SNMP::Client
       msg = get_next(oid, sock)
 
       # While the message is not nil and the returned oid is a child of the request
-      while (!msg.nil? && self.class.oid_within?(msg.oid, oid))
+      while !msg.nil? && self.class.oid_within?(msg.oid, oid)
         # Break at END OF MIB
         break if msg.value.payload.empty?
 
