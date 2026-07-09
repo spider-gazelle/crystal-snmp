@@ -1,41 +1,132 @@
+---
 name: CI
+
+permissions: {}
+
 on:
   push:
+    branches:
+      - '**'
+    paths-ignore:
+      - "**.md"
   pull_request:
-  workflow_dispatch:
+    branches:
+      - '**'
+    paths-ignore:
+      - "**.md"
   schedule:
     - cron: "0 6 * * 1"
+  workflow_dispatch:
+
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        crystal:
-          - latest
-          - nightly
-          - 1.2.0
-    runs-on: ${{ matrix.os }}
-    container: crystallang/crystal:${{ matrix.crystal }}-alpine
-
-    services:
-      # Label used to access the service container
-      snmpd:
-        # Docker Hub image
-        image: tandrup/snmpsim
-        # Not sure how to configure this correctly...
-        # env:
-        #   EXTRA_FLAGS="--v3-user=usr-md5-none --v3-auth-key=authkey1 --v3-auth-proto=MD5"
-
+  format:
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Install dependencies
-      run: shards install --ignore-crystal-version
-    - name: Lint
-      run: ./bin/ameba
-    - name: Format
-      run: crystal tool format --check
-    - name: Run tests
-      run: crystal spec -v --error-trace
-      env:
-        TEST_SNMP_SERVER: snmpd
+      - name: Git checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+
+      - name: Check formatting
+        run: mise dev:format-check
+
+  ameba:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+
+      - name: Install dependencies
+        run: mise dev:deps
+
+      - name: Run static code analysis
+        run: mise dev:ameba
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+
+      - name: Install dependencies
+        run: mise dev:deps
+
+      - name: Build API docs
+        run: mise dev:docs
+
+  test_linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+
+      - name: Install dependencies
+        run: mise dev:deps
+
+      - name: Run tests
+        run: mise dev:spec
+
+      - name: Run tests (multi-threaded)
+        run: mise dev:spec-mt
+
+  # Best-effort early warning against the Crystal nightly compiler. mise has no
+  # nightly build, so this job uses the nightly container directly and is allowed
+  # to fail. The e2e (live server) and legacy (OpenSSL legacy provider) specs are
+  # skipped, matching `mise dev:spec`.
+  test_nightly_linux:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    container: crystallang/crystal:nightly
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install dependencies
+        run: shards install --skip-postinstall --skip-executables
+
+      - name: Run tests
+        run: crystal spec --error-trace --tag '~e2e' --tag '~legacy'
+
+  test_macos_arm64:
+    runs-on: macos-26
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@v4
+
+      # TODO: remove me when https://github.com/crystal-lang/crystal/issues/16746 is fixed
+      - name: Fix Crystal shards
+        run: mise dev:fix-shards-command
+
+      - name: Install dependencies
+        run: mise dev:deps
+
+      - name: Run tests
+        run: mise dev:spec
+
+      - name: Run tests (multi-threaded)
+        run: mise dev:spec-mt

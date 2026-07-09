@@ -1,0 +1,8 @@
+# TODO comments are intentional roadmap markers in this codebase.
+Documentation/DocumentationAdmonition:
+  Enabled: false
+
+# helper.cr is a shared spec helper, not a spec file.
+Lint/SpecFilename:
+  Excluded:
+    - spec/helper.cr

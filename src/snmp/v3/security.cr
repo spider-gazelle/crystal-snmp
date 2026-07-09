@@ -24,7 +24,7 @@ class SNMP::V3::Security
   getter security_level : MessageFlags
   getter auth_protocol : AuthProtocol
   getter priv_protocol : PrivacyProtocol
-  getter verify_messages : Bool
+  getter? verify_messages : Bool
   @auth_pass_key : Bytes = Bytes.new(0)
   @priv_pass_key : Bytes = Bytes.new(0)
   @digest : OpenSSL::Digest
