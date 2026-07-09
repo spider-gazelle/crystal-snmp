@@ -65,7 +65,7 @@ class SNMP::V3::Message < SNMP::Message
     @pdu = @scoped_pdu.pdu
   end
 
-  def self.new(snmp = ASN1::BER, security : Security? = nil)
+  def self.new(snmp : ASN1::BER, security : Security? = nil)
     V3::Message.new(snmp.children, security)
   end
 
