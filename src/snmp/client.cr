@@ -2,7 +2,7 @@ require "socket"
 require "../snmp"
 
 class SNMP::Client
-  class Error < Exception
+  class Error < SNMP::Error
   end
 
   getter socket : UDPSocket
@@ -36,8 +36,26 @@ class SNMP::Client
       socket.read_timeout = timeout
     end
     socket.connect(host, port)
-    yield socket
-    socket.close
+    begin
+      yield socket
+    rescue ex : IO::TimeoutError
+      raise SNMP::TimeoutError.new("no response from #{host}:#{port} within #{timeout}s", cause: ex)
+    rescue ex : BinData::ParseError
+      # A read timeout surfaces here as a BinData::ParseError wrapping IO::TimeoutError
+      raise SNMP::TimeoutError.new("no response from #{host}:#{port} within #{timeout}s", cause: ex) if timed_out?(ex)
+      raise ex
+    ensure
+      socket.close
+    end
+  end
+
+  private def timed_out?(error : Exception) : Bool
+    cause = error.cause
+    while cause
+      return true if cause.is_a?(IO::TimeoutError)
+      cause = cause.cause
+    end
+    false
   end
 
   def get(oid : String) : SNMP::Message

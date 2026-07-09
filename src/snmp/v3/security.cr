@@ -6,7 +6,11 @@ class SNMP::V3::Security
   IPAD = Bytes.new(64, 0x36)
   OPAD = Bytes.new(64, 0x5c)
 
-  class Error < Exception
+  class Error < SNMP::Error
+  end
+
+  # Raised when a message's authentication signature does not verify.
+  class AuthenticationError < Error
   end
 
   enum AuthProtocol

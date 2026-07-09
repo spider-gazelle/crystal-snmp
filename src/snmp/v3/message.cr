@@ -107,7 +107,7 @@ class SNMP::V3::Message < SNMP::Message
   def verify(security, scoped_pdu = @scoped_pdu.to_ber)
     return if security.security_level == MessageFlags::None
     existing_signature, signature = sign(security, scoped_pdu)
-    raise "message authentication failed. Salt did not match" unless existing_signature == signature
+    raise Security::AuthenticationError.new("message authentication failed. Salt did not match") unless existing_signature == signature
   end
 
   def sign(security, scoped_pdu = @scoped_pdu.to_ber)

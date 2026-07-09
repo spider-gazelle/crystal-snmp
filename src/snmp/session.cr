@@ -37,7 +37,7 @@ class SNMP::Session
     snmp = message.children
     version = Version.from_value(snmp[0].get_integer)
 
-    raise "SNMP version mismatch, expected V2C got #{version}" unless version < Version::V3
+    raise SNMP::VersionError.new("SNMP version mismatch, expected V2C got #{version}") unless version < Version::V3
 
     SNMP::Message.new(snmp)
   end
@@ -73,7 +73,7 @@ class SNMP::Session
     when VarBind
       data.oid = oid
     else
-      raise "unsupported varbind value. For complex values pass a pre-constructed `ASN1::BER`"
+      raise ArgumentError.new("unsupported varbind value. For complex values pass a pre-constructed `ASN1::BER`")
     end
 
     SNMP::Message.new(@community, Request::Set, data, request_id)
