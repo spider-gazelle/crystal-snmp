@@ -90,7 +90,7 @@ class SNMP::V3::Session
     snmp = message.children
     version = Version.from_value(snmp[0].get_integer)
 
-    raise "SNMP version mismatch, expected V3 got #{version}" unless version == Version::V3
+    raise SNMP::VersionError.new("SNMP version mismatch, expected V3 got #{version}") unless version == Version::V3
 
     V3::Message.new(snmp, security)
   end
@@ -130,7 +130,7 @@ class SNMP::V3::Session
     when VarBind
       data.oid = oid
     else
-      raise "unsupported varbind value. For complex values pass a pre-constructed `ASN1::BER`"
+      raise ArgumentError.new("unsupported varbind value. For complex values pass a pre-constructed `ASN1::BER`")
     end
 
     pdu = PDU.new(request_id, data)
