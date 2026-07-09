@@ -1,7 +1,7 @@
 require "./helper"
 
 describe SNMP::Client do
-  it "should perform a walk" do
+  it "should perform a walk", tags: "e2e" do
     client = SNMP::Client.new(TEST_SNMP_SERVER)
     client.should_not be_nil
     messages = client.walk("1.3.6.1.2.1.1.9.1.3")
@@ -9,7 +9,7 @@ describe SNMP::Client do
     messages.empty?.should be_false
   end
 
-  it "should perform a walk using a block" do
+  it "should perform a walk using a block", tags: "e2e" do
     client = SNMP::Client.new(TEST_SNMP_SERVER)
     client.should_not be_nil
     messages = [] of SNMP::Message
