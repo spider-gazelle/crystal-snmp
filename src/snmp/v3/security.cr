@@ -1,11 +1,9 @@
 require "openssl"
+require "openssl/hmac"
 
 # Based on: https://github.com/swisscom/ruby-netsnmp/blob/master/lib/netsnmp/security_parameters.rb
 
 class SNMP::V3::Security
-  IPAD = Bytes.new(64, 0x36)
-  OPAD = Bytes.new(64, 0x5c)
-
   class Error < SNMP::Error
   end
 
@@ -15,12 +13,18 @@ class SNMP::V3::Security
 
   enum AuthProtocol
     MD5
-    SHA
+    SHA # SHA-1
+    SHA224
+    SHA256
+    SHA384
+    SHA512
   end
 
   enum PrivacyProtocol
     DES
-    AES
+    AES # AES-128
+    AES192
+    AES256
   end
 
   property engine_id : String
@@ -50,14 +54,7 @@ class SNMP::V3::Security
                         MessageFlags::None
                       end
 
-    @digest = case @auth_protocol
-              when AuthProtocol::MD5
-                OpenSSL::Digest.new("md5")
-              when AuthProtocol::SHA
-                OpenSSL::Digest.new("sha1")
-              else
-                raise ArgumentError.new("unsupported digest protocol")
-              end
+    @digest = OpenSSL::Digest.new(digest_name)
 
     if @security_level > MessageFlags::None
       raise ArgumentError.new("auth password must have between 8 to 32 characters") unless (8..32).covers?(@auth_password.size)
@@ -107,35 +104,44 @@ class SNMP::V3::Security
     return Bytes.new(0) if @security_level == MessageFlags::None
 
     io = IO::Memory.new
-    io.write auth_key
-    io.write Bytes.new(@auth_protocol == AuthProtocol::MD5 ? 48 : 44)
-    bytes = io.to_slice
-
-    k1 = bytes.clone
-    k1.each_with_index do |byte, index|
-      k1[index] = byte ^ IPAD[index]
-    end
-
-    k2 = bytes
-    k2.each_with_index do |byte, index|
-      k2[index] = byte ^ OPAD[index]
-    end
-
-    io = IO::Memory.new
-    io.write k1
     io.write_bytes message
+    # HMAC(auth_key, message) truncated to the protocol's msgAuthenticationParameters length
+    OpenSSL::HMAC.digest(hmac_algorithm, auth_key, io.to_slice)[0, auth_param_length]
+  end
 
-    @digest.reset
-    @digest << io.to_slice
-    d1 = @digest.final
+  # OpenSSL digest name for the auth protocol.
+  private def digest_name : String
+    case @auth_protocol
+    in AuthProtocol::MD5    then "md5"
+    in AuthProtocol::SHA    then "sha1"
+    in AuthProtocol::SHA224 then "sha224"
+    in AuthProtocol::SHA256 then "sha256"
+    in AuthProtocol::SHA384 then "sha384"
+    in AuthProtocol::SHA512 then "sha512"
+    end
+  end
 
-    io = IO::Memory.new
-    io.write k2
-    io.write d1
+  private def hmac_algorithm : OpenSSL::Algorithm
+    case @auth_protocol
+    in AuthProtocol::MD5    then OpenSSL::Algorithm::MD5
+    in AuthProtocol::SHA    then OpenSSL::Algorithm::SHA1
+    in AuthProtocol::SHA224 then OpenSSL::Algorithm::SHA224
+    in AuthProtocol::SHA256 then OpenSSL::Algorithm::SHA256
+    in AuthProtocol::SHA384 then OpenSSL::Algorithm::SHA384
+    in AuthProtocol::SHA512 then OpenSSL::Algorithm::SHA512
+    end
+  end
 
-    @digest.reset
-    @digest << io.to_slice
-    @digest.final[0, 12]
+  # msgAuthenticationParameters length: RFC 3414 (MD5/SHA1 = 12) and RFC 7860.
+  def auth_param_length : Int32
+    case @auth_protocol
+    in AuthProtocol::MD5    then 12
+    in AuthProtocol::SHA    then 12
+    in AuthProtocol::SHA224 then 16
+    in AuthProtocol::SHA256 then 24
+    in AuthProtocol::SHA384 then 32
+    in AuthProtocol::SHA512 then 48
+    end
   end
 
   @auth_key : Bytes = Bytes.new(0)
@@ -148,8 +154,37 @@ class SNMP::V3::Security
   @priv_key : Bytes = Bytes.new(0)
 
   def priv_key
-    @priv_key = localize_key(@priv_pass_key) if @priv_key.empty?
+    if @priv_key.empty?
+      key = localize_key(@priv_pass_key)
+      needed = priv_key_length
+      # extend a too-short localized key; never truncate (priv_key is the full key material)
+      @priv_key = key.size < needed ? extend_key(key, needed) : key
+    end
     @priv_key
+  end
+
+  # Localized key length required by the privacy protocol.
+  private def priv_key_length : Int32
+    case @priv_protocol
+    in PrivacyProtocol::DES    then 16 # 8-byte key + 8-byte pre-IV
+    in PrivacyProtocol::AES    then 16
+    in PrivacyProtocol::AES192 then 24
+    in PrivacyProtocol::AES256 then 32
+    end
+  end
+
+  # Blumenthal key-localization extension (draft-blumenthal-aes-usm-04 3.1.2.1):
+  # Kul' = Kul || H(Kul) || H(Kul || H(Kul)) || ... — each step hashes the whole
+  # accumulated key. (Cisco uses the alternative Reeder 3DESEDE chaining.)
+  private def extend_key(key : Bytes, needed : Int32) : Bytes
+    io = IO::Memory.new
+    io.write key
+    while io.size < needed
+      @digest.reset
+      @digest << io.to_slice
+      io.write @digest.final
+    end
+    io.to_slice[0, needed]
   end
 
   private def localize_key(key)
@@ -186,10 +221,8 @@ class SNMP::V3::Security
     crypt ||= case @priv_protocol
               when PrivacyProtocol::DES
                 DES.new(priv_key)
-              when PrivacyProtocol::AES
-                AES.new(priv_key)
-              else
-                raise Security::Error.new("unknown privacy protocol")
+              else # AES-128/192/256 — pass exactly the cipher key length
+                AES.new(priv_key[0, priv_key_length])
               end
     @encryption = crypt
   end

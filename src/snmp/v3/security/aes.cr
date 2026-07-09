@@ -8,7 +8,7 @@ class SNMP::V3::Security::AES
   end
 
   def encrypt(decrypted_data : Bytes, engine_boots, engine_time)
-    cipher = OpenSSL::Cipher.new("aes-128-cfb")
+    cipher = OpenSSL::Cipher.new(cipher_name)
 
     iv, salt = generate_encryption_key(engine_boots, engine_time)
 
@@ -36,7 +36,7 @@ class SNMP::V3::Security::AES
     # 3.3.2.1
     raise "invalid privacy salt received" unless (salt.size % 8).zero?
 
-    cipher = OpenSSL::Cipher.new("aes-128-cfb")
+    cipher = OpenSSL::Cipher.new(cipher_name)
     cipher.padding = false
 
     iv = generate_decryption_key(engine_boots, engine_time, salt)
@@ -88,6 +88,15 @@ class SNMP::V3::Security::AES
   end
 
   private def aes_key
-    @priv_key[0, 16].clone
+    @priv_key.clone
+  end
+
+  # CFB cipher for the localized-key length: 16 -> AES-128, 24 -> AES-192, 32 -> AES-256.
+  private def cipher_name : String
+    case @priv_key.size
+    when 24 then "aes-192-cfb"
+    when 32 then "aes-256-cfb"
+    else         "aes-128-cfb"
+    end
   end
 end
