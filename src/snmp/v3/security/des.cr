@@ -12,6 +12,9 @@ class SNMP::V3::Security::DES
     iv, salt = generate_encryption_key(engine_boots)
 
     cipher.encrypt
+    # RFC 3414 uses explicit zero-padding to the block size; disable the cipher's
+    # own PKCS padding so it does not append a spurious extra block.
+    cipher.padding = false
     cipher.iv = iv
     cipher.key = des_key
 
