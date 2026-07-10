@@ -3,16 +3,16 @@ class SNMP::PDU
     pdu = SNMP.ber_fields(ber, 4, "PDU")
     @request_id = pdu[0].get_integer.to_i32
     @error_status = SNMP.decode_enum(ErrorStatus, pdu[1].get_integer, "error-status")
-    @error_index = SNMP.decode_enum(ErrorIndex, pdu[2].get_integer, "error-index") # pdu[2].get_integer.to_i32
+    @error_index = pdu[2].get_integer.to_i32
     @varbinds = pdu[3].children.map do |varbind|
       VarBind.new(varbind)
     end
   end
 
-  def initialize(@request_id = rand(2147483647), @varbinds : Array(VarBind) = [] of VarBind, @error_status = ErrorStatus::NoError, @error_index = ErrorIndex::NoError)
+  def initialize(@request_id = rand(2147483647), @varbinds : Array(VarBind) = [] of VarBind, @error_status = ErrorStatus::NoError, @error_index = 0)
   end
 
-  def initialize(@request_id = rand(2147483647), varbind : VarBind? = nil, @error_status = ErrorStatus::NoError, @error_index = ErrorIndex::NoError)
+  def initialize(@request_id = rand(2147483647), varbind : VarBind? = nil, @error_status = ErrorStatus::NoError, @error_index = 0)
     if varbind
       @varbinds = [varbind]
     else
@@ -22,7 +22,7 @@ class SNMP::PDU
 
   property request_id : Int32
   property error_status : ErrorStatus
-  property error_index : ErrorIndex
+  property error_index : Int32
   property varbinds : Array(VarBind)
 
   def new_request_id
