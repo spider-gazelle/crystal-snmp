@@ -101,7 +101,6 @@ class SNMP::V3::Message < SNMP::Message
     @id = rand(2147483647)
   end
 
-  AUTHNONE     = Bytes.new(12)
   PRIVNONE     = ASN1::BER.new.set_string("", tag: UniversalTags::OctetString)
   MSG_MAX_SIZE = ASN1::BER.new.set_integer(65507)
   MSG_VERSION  = ASN1::BER.new.set_integer(Version::V3.to_i)
@@ -113,9 +112,9 @@ class SNMP::V3::Message < SNMP::Message
   end
 
   def sign(security, scoped_pdu = @scoped_pdu.to_ber)
-    # ensure auth param is 0'd
+    # zero the auth param to the protocol's length before computing the HMAC
     existing_signature = @security_params.auth_param
-    @security_params.auth_param = AUTHNONE
+    @security_params.auth_param = Bytes.new(security.auth_param_length)
 
     # Sign the request
     signature = security.sign(to_ber(scoped_pdu))
