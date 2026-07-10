@@ -25,6 +25,11 @@ class SNMP::PDU
   property error_index : Int32
   property varbinds : Array(VarBind)
 
+  # GetBulk (RFC 3416) overloads the error-status / error-index slots with
+  # non-repeaters / max-repetitions. These are only emitted for a GetBulk PDU.
+  property non_repeaters : Int32 = 0
+  property max_repetitions : Int32 = 0
+
   def new_request_id
     @request_id = rand(2147483647)
   end
@@ -43,11 +48,15 @@ class SNMP::PDU
     req = ASN1::BER.new
     req.set_integer(@request_id)
 
+    # GetBulk reuses the two integer slots as non-repeaters / max-repetitions;
+    # every other PDU type carries error-status / error-index there.
+    bulk = tag_number == Request::GetBulk.to_u8
+
     error = ASN1::BER.new
-    error.set_integer(@error_status.to_i)
+    error.set_integer(bulk ? @non_repeaters : @error_status.to_i)
 
     index = ASN1::BER.new
-    index.set_integer(@error_index.to_i)
+    index.set_integer(bulk ? @max_repetitions : @error_index)
 
     varb = ASN1::BER.new
     varb.tag_number = ASN1::BER::UniversalTags::Sequence
