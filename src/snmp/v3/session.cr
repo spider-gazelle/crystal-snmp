@@ -185,18 +185,29 @@ class SNMP::V3::Session
     V3::Message.new(scoped_pdu, sec_params, @security, security_model, message_id)
   end
 
-  # TODO:: requires better support for SNMP values such as Counter32, Counter64, Gauge32, OID, Timeticks etc
   def set(oid, value, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
+    build_set([to_varbind(oid, value)], request_id, message_id, security_model)
+  end
+
+  private def build_set(varbinds : Array(VarBind), request_id, message_id, security_model) : V3::Message
+    pdu = PDU.new(request_id, varbinds)
+    scoped_pdu = ScopedPDU.new(Request::Set, pdu, @engine_id)
+    sec_params = SecurityParams.new(@security.username, @engine_id, @engine_boots, @engine_time)
+
+    V3::Message.new(scoped_pdu, sec_params, @security, security_model, message_id)
+  end
+
+  # Encode a single OID => value assignment into a VarBind (see `Session#to_varbind`).
+  private def to_varbind(oid, value) : VarBind
     data = value.is_a?(VarBind) ? value : VarBind.new(oid)
 
     case value
+    when TypedValue
+      data.value = value.to_ber
     when String
       data.value.set_string(value)
     when Int
       data.value.set_integer(value)
-      # TODO::
-      # when Float
-      # when Socket::IPAddress
     when Bool
       data.value.set_boolean(value)
     when Nil
@@ -209,10 +220,6 @@ class SNMP::V3::Session
       raise ArgumentError.new("unsupported varbind value. For complex values pass a pre-constructed `ASN1::BER`")
     end
 
-    pdu = PDU.new(request_id, data)
-    scoped_pdu = ScopedPDU.new(Request::Set, pdu, @engine_id)
-    sec_params = SecurityParams.new(@security.username, @engine_id, @engine_boots, @engine_time)
-
-    V3::Message.new(scoped_pdu, sec_params, @security, security_model, message_id)
+    data
   end
 end
