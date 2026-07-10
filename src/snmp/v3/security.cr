@@ -11,6 +11,11 @@ class SNMP::V3::Security
   class AuthenticationError < Error
   end
 
+  # Raised when an inbound authenticated message falls outside the RFC 3414
+  # time window — a replay, or a boots/clock mismatch with the remote engine.
+  class NotInTimeWindowError < AuthenticationError
+  end
+
   enum AuthProtocol
     MD5
     SHA # SHA-1
@@ -32,6 +37,13 @@ class SNMP::V3::Security
   getter security_level : MessageFlags
   getter auth_protocol : AuthProtocol
   getter priv_protocol : PrivacyProtocol
+
+  # Whether inbound authenticated messages have their HMAC verified.
+  #
+  # WARNING: setting this to `false` disables authentication verification of
+  # received messages — a forged or tampered response is then accepted as
+  # genuine. Leave it at the default (`true`) unless you are deliberately
+  # inspecting traffic and understand that the security guarantee is voided.
   getter? verify_messages : Bool
   @auth_pass_key : Bytes = Bytes.new(0)
   @priv_pass_key : Bytes = Bytes.new(0)

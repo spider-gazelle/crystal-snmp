@@ -4,7 +4,9 @@ require "openssl/cipher"
 # http://www.snmp.com/eso/rfc3826.txt
 
 class SNMP::V3::Security::AES
-  def initialize(@priv_key : Bytes, @local = rand(0xffffffffffffffff_u64))
+  # `@local` seeds the per-message salt counter; use a CSPRNG so the initial
+  # salt (and thus the AES IV sequence) is not predictable across processes.
+  def initialize(@priv_key : Bytes, @local = Random::Secure.rand(0xffffffffffffffff_u64))
   end
 
   def encrypt(decrypted_data : Bytes, engine_boots, engine_time)
