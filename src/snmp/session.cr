@@ -80,6 +80,13 @@ class SNMP::Session
     SNMP::Message.new(@community, Request::Set, to_varbind(oid, value), request_id)
   end
 
+  # Multi-varbind Set: one SetRequest assigning every OID => value pair. The Hash
+  # keeps insertion order, so the varbinds go out in the order they were given.
+  def set(values : Hash(String, _), request_id = rand(2147483647))
+    varbinds = values.map { |oid, value| to_varbind(oid, value) }
+    SNMP::Message.new(@community, Request::Set, varbinds, request_id)
+  end
+
   # Encode a single OID => value assignment into a VarBind. Accepts the typed
   # SNMP values (`TypedValue`), the Crystal primitives, a raw `ASN1::BER`, or a
   # pre-built `VarBind`.

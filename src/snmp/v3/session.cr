@@ -189,6 +189,12 @@ class SNMP::V3::Session
     build_set([to_varbind(oid, value)], request_id, message_id, security_model)
   end
 
+  # Multi-varbind Set: one SetRequest assigning every OID => value pair (Hash
+  # keeps insertion order).
+  def set(values : Hash(String, _), request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
+    build_set(values.map { |oid, value| to_varbind(oid, value) }, request_id, message_id, security_model)
+  end
+
   private def build_set(varbinds : Array(VarBind), request_id, message_id, security_model) : V3::Message
     pdu = PDU.new(request_id, varbinds)
     scoped_pdu = ScopedPDU.new(Request::Set, pdu, @engine_id)
