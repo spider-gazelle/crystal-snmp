@@ -51,7 +51,7 @@ class SNMP::V3::Message < SNMP::Message
     @pdu = @scoped_pdu.pdu
   end
 
-  def initialize(@scoped_pdu : ScopedPDU, @security_params : SecurityParams, security : Security? = nil, @security_model = SecurityModel::User, @id = rand(2147483647))
+  def initialize(@scoped_pdu : ScopedPDU, @security_params : SecurityParams, security : Security? = nil, @security_model = SecurityModel::USM, @id = rand(2147483647))
     @version = Version::V3
     @max_size = 65507
     if security
