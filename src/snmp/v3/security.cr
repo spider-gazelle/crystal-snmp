@@ -83,10 +83,6 @@ class SNMP::V3::Security
 
       encrypted_pdu, salt = crypt.encrypt(io.to_slice, engine_boots: engine_boots, engine_time: engine_time)
 
-      # WTF: This does not match when using DES... Always out by 1 byte
-      # slice = io.to_slice
-      # crypt.decrypt(encrypted_pdu, salt, engine_boots, engine_time).to_slice[0...slice.size].should eq slice
-
       pdu = ASN1::BER.new.set_bytes(encrypted_pdu)
       {pdu, salt.to_slice}
     else
