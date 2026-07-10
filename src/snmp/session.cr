@@ -46,9 +46,33 @@ class SNMP::Session
     SNMP::Message.new(@community, Request::Get, VarBind.new(oid), request_id)
   end
 
+  # Multi-varbind Get: one GetRequest carrying every OID (RFC 3416 allows a PDU
+  # to bind several variables), answered by a single Response with N varbinds.
+  def get(oids : Enumerable(String), request_id = rand(2147483647))
+    varbinds = oids.map { |oid| VarBind.new(oid) }.to_a
+    SNMP::Message.new(@community, Request::Get, varbinds, request_id)
+  end
+
   def get_next(oid, request_id = rand(2147483647))
     message = get(oid, request_id)
     message.request = Request::GetNext
+    message
+  end
+
+  def get_next(oids : Enumerable(String), request_id = rand(2147483647))
+    message = get(oids, request_id)
+    message.request = Request::GetNext
+    message
+  end
+
+  # GetBulk (RFC 3416): retrieve up to *max_repetitions* successors for each
+  # repeating varbind in one round-trip. The first *non_repeaters* OIDs are
+  # treated as plain GetNext, the rest as repeaters.
+  def get_bulk(oids : Enumerable(String), non_repeaters = 0, max_repetitions = 10, request_id = rand(2147483647))
+    varbinds = oids.map { |oid| VarBind.new(oid) }.to_a
+    message = SNMP::Message.new(@community, Request::GetBulk, varbinds, request_id)
+    message.non_repeaters = non_repeaters
+    message.max_repetitions = max_repetitions
     message
   end
 

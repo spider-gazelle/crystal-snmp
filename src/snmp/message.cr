@@ -30,7 +30,7 @@ class SNMP::Message
   property request : Request
   property community : String
 
-  {% for proxy in [:varbinds, :request_id, :error_index, :error_status] %}
+  {% for proxy in [:varbinds, :request_id, :error_index, :error_status, :non_repeaters, :max_repetitions] %}
     def {{proxy.id}}
       @pdu.{{proxy.id}}
     end
