@@ -65,6 +65,17 @@ class SNMP::Session
     message
   end
 
+  # GetBulk (RFC 3416): retrieve up to *max_repetitions* successors for each
+  # repeating varbind in one round-trip. The first *non_repeaters* OIDs are
+  # treated as plain GetNext, the rest as repeaters.
+  def get_bulk(oids : Enumerable(String), non_repeaters = 0, max_repetitions = 10, request_id = rand(2147483647))
+    varbinds = oids.map { |oid| VarBind.new(oid) }.to_a
+    message = SNMP::Message.new(@community, Request::GetBulk, varbinds, request_id)
+    message.non_repeaters = non_repeaters
+    message.max_repetitions = max_repetitions
+    message
+  end
+
   # TODO:: requires better support for SNMP values such as Counter32, Counter64, Gauge32, OID, Timeticks etc
   def set(oid, value, request_id = rand(2147483647))
     data = value.is_a?(VarBind) ? value : VarBind.new(oid)

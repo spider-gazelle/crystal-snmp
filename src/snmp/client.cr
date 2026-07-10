@@ -147,6 +147,29 @@ class SNMP::Client
     session.parse(sock.read_bytes(ASN1::BER))
   end
 
+  # GetBulk: one round-trip returning up to *max_repetitions* successors per
+  # repeating OID. Returns the raw Response message (its PDU holds every varbind).
+  def get_bulk(oids : Enumerable(String), non_repeaters = 0, max_repetitions = 10) : SNMP::Message
+    msg : SNMP::Message? = nil
+    with_socket do |sock|
+      msg = get_bulk(oids, sock, non_repeaters, max_repetitions)
+    end
+
+    raise Error.new("Failed to read message") if msg.nil?
+    msg
+  end
+
+  private def get_bulk(oids : Enumerable(String), sock : UDPSocket, non_repeaters, max_repetitions) : SNMP::Message
+    check_validation_probe(sock)
+
+    message = session.get_bulk(oids, non_repeaters, max_repetitions)
+    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
+
+    sock.write_bytes message
+    sock.flush
+    session.parse(sock.read_bytes(ASN1::BER))
+  end
+
   def walk(oid : String) : Array(SNMP::Message)
     messages = [] of SNMP::Message
     with_socket do |sock|
@@ -154,8 +177,8 @@ class SNMP::Client
 
       # While the message is not nil and the returned oid is a child of the request
       while !msg.nil? && self.class.oid_within?(msg.oid, oid)
-        # Break at END OF MIB
-        break if msg.value.payload.empty?
+        # Stop at the RFC 3416 endOfMibView exception (not merely an empty value).
+        break if msg.value.end_of_mib_view?
 
         messages << msg
         msg = get_next(msg.oid, sock)
@@ -170,14 +193,49 @@ class SNMP::Client
 
       # While the message is not nil and the returned oid is a child of the request
       while !msg.nil? && self.class.oid_within?(msg.oid, oid)
-        # Break at END OF MIB
-        break if msg.value.payload.empty?
+        # Stop at the RFC 3416 endOfMibView exception (not merely an empty value).
+        break if msg.value.end_of_mib_view?
 
         yield msg
         msg = get_next(msg.oid, sock)
       end
     end
     self
+  end
+
+  # Walk *oid*'s subtree using GetBulk (fewer round-trips than GetNext), yielding
+  # each in-subtree `VarBind`. Stops at `endOfMibView` or the first varbind that
+  # leaves the subtree. *max_repetitions* bounds the varbinds fetched per request.
+  def bulk_walk(oid : String, max_repetitions = 10, &)
+    with_socket do |sock|
+      current = oid
+      loop do
+        varbinds = get_bulk({current}, sock, 0, max_repetitions).varbinds
+        # No varbinds at all: nothing more to fetch (defensive against a stuck agent).
+        break if varbinds.empty?
+
+        advanced = false
+        varbinds.each do |varbind|
+          # End of the MIB, or the subtree is exhausted (GetBulk overshoots it).
+          return self if varbind.end_of_mib_view? || !self.class.oid_within?(varbind.oid, oid)
+
+          yield varbind
+          current = varbind.oid
+          advanced = true
+        end
+
+        # A full response with no in-subtree progress would loop forever.
+        break unless advanced
+      end
+    end
+    self
+  end
+
+  # Non-block form: collect the whole subtree into an array of `VarBind`.
+  def bulk_walk(oid : String, max_repetitions = 10) : Array(SNMP::VarBind)
+    results = [] of SNMP::VarBind
+    bulk_walk(oid, max_repetitions) { |varbind| results << varbind }
+    results
   end
 
   protected def check_validation_probe(sock)

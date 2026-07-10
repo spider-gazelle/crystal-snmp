@@ -172,6 +172,19 @@ class SNMP::V3::Session
     message
   end
 
+  # GetBulk (RFC 3416): up to *max_repetitions* successors per repeating varbind
+  # in one round-trip; the first *non_repeaters* OIDs act as plain GetNext.
+  def get_bulk(oids : Enumerable(String), non_repeaters = 0, max_repetitions = 10, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
+    varbinds = oids.map { |oid| VarBind.new(oid) }.to_a
+    pdu = PDU.new(request_id, varbinds)
+    pdu.non_repeaters = non_repeaters
+    pdu.max_repetitions = max_repetitions
+    scoped_pdu = ScopedPDU.new(Request::GetBulk, pdu, @engine_id)
+    sec_params = SecurityParams.new(@security.username, @engine_id, @engine_boots, @engine_time)
+
+    V3::Message.new(scoped_pdu, sec_params, @security, security_model, message_id)
+  end
+
   # TODO:: requires better support for SNMP values such as Counter32, Counter64, Gauge32, OID, Timeticks etc
   def set(oid, value, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
     data = value.is_a?(VarBind) ? value : VarBind.new(oid)
