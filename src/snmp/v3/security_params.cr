@@ -2,7 +2,7 @@ class SNMP::V3::SecurityParams
   def initialize(params : ASN1::BER)
     temp = IO::Memory.new(params.payload)
     security = temp.read_bytes(ASN1::BER)
-    parts = security.children
+    parts = SNMP.ber_fields(security, 6, "v3 security params")
 
     # 10-64 Hex characters
     @engine_id = parts[0].get_hexstring

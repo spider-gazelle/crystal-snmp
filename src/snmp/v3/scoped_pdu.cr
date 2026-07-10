@@ -1,14 +1,14 @@
 # This is not really a PDU, but a container for a PDU
 class SNMP::V3::ScopedPDU
   def initialize(ber : ASN1::BER)
-    pdu = ber.children
+    pdu = SNMP.ber_fields(ber, 3, "scoped PDU")
     @context_engine_id = pdu[0].get_hexstring
     @context = if pdu[1].get_bytes.empty?
                  ""
                else
                  pdu[1].get_object_id
                end
-    @request = Request.from_value(pdu[2].tag_number)
+    @request = SNMP.decode_enum(Request, pdu[2].tag_number, "PDU request type")
 
     case @request
     when Request::V1_Trap

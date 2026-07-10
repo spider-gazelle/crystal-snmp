@@ -101,8 +101,8 @@ class SNMP
   end
 
   def self.parse(message : ASN1::BER, security = nil) : Message | V3::Message
-    snmp = message.children
-    version = Version.from_value(snmp[0].get_integer)
+    snmp = ber_fields(message, 1, "SNMP message")
+    version = decode_enum(Version, snmp[0].get_integer, "SNMP version")
 
     case version
     when Version::V3

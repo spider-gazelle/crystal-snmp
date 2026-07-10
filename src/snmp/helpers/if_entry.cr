@@ -74,9 +74,9 @@ class SNMP
         when "1.3.6.1.2.1.2.2.1.6"
           @phys_address = varbind.get_string
         when "1.3.6.1.2.1.2.2.1.7"
-          @admin_status = IfAdminStatus.from_value(varbind.get_integer)
+          @admin_status = IfAdminStatus.from_value?(varbind.get_integer) || IfAdminStatus::Up
         when "1.3.6.1.2.1.2.2.1.8"
-          @oper_status = IfOperStatus.from_value(varbind.get_integer)
+          @oper_status = IfOperStatus.from_value?(varbind.get_integer) || IfOperStatus::Unknown
         when "1.3.6.1.2.1.2.2.1.9"
           @last_change = varbind.get_unsigned32
         when "1.3.6.1.2.1.2.2.1.10"

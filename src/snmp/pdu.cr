@@ -1,9 +1,9 @@
 class SNMP::PDU
   def initialize(ber : ASN1::BER)
-    pdu = ber.children
+    pdu = SNMP.ber_fields(ber, 4, "PDU")
     @request_id = pdu[0].get_integer.to_i32
-    @error_status = ErrorStatus.from_value(pdu[1].get_integer)
-    @error_index = ErrorIndex.from_value(pdu[2].get_integer) # pdu[2].get_integer.to_i32
+    @error_status = SNMP.decode_enum(ErrorStatus, pdu[1].get_integer, "error-status")
+    @error_index = SNMP.decode_enum(ErrorIndex, pdu[2].get_integer, "error-index") # pdu[2].get_integer.to_i32
     @varbinds = pdu[3].children.map do |varbind|
       VarBind.new(varbind)
     end

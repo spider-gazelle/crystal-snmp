@@ -7,15 +7,17 @@ class SNMP::V3::Message < SNMP::Message
   def initialize(snmp : Array(ASN1::BER), security = nil)
     # reference: http://www.tcpipguide.com/free/t_SNMPVersion3SNMPv3MessageFormat.htm
     # version, headers, security, encrypted pdu
-    @version = Version.from_value(snmp[0].get_integer)
-    headers = snmp[1].children
+    raise SNMP::ParseError.new("truncated v3 message: expected at least 4 fields, got #{snmp.size}") if snmp.size < 4
+    @version = SNMP.decode_enum(Version, snmp[0].get_integer, "SNMP version")
+    headers = SNMP.ber_fields(snmp[1], 4, "v3 header")
 
     # A unique identifier used between two SNMP entities to coordinate request and response messages
     @id = headers[0].get_integer.to_i
 
     # This is the maximum segment size that the sender can accept from another SNMP engine
     @max_size = headers[1].get_integer.to_i
-    @flags = MessageFlags.new(headers[2].get_bytes[0].to_i)
+    flag_bytes = headers[2].get_bytes
+    @flags = MessageFlags.new(flag_bytes.empty? ? 0 : flag_bytes[0].to_i)
     @security_model = SecurityModel.new(headers[3].get_integer.to_i)
 
     # Extract security params

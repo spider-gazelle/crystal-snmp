@@ -34,8 +34,8 @@ class SNMP::Session
   end
 
   def parse(message : ASN1::BER, security = nil) : SNMP::Message
-    snmp = message.children
-    version = Version.from_value(snmp[0].get_integer)
+    snmp = SNMP.ber_fields(message, 1, "SNMP message")
+    version = SNMP.decode_enum(Version, snmp[0].get_integer, "SNMP version")
 
     raise SNMP::VersionError.new("SNMP version mismatch, expected V2C got #{version}") unless version < Version::V3
 

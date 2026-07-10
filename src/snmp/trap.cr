@@ -3,6 +3,7 @@ class SNMP::Trap < SNMP::PDU
   def initialize(ber : ASN1::BER)
     super(ber)
 
+    raise SNMP::ParseError.new("truncated v2 trap: expected at least 2 varbinds, got #{@varbinds.size}") if @varbinds.size < 2
     @time_ticks = SNMP.get_unsigned32(@varbinds[0].value)
     @oid = @varbinds[1].value.get_object_id
   end
