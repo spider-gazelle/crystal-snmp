@@ -11,6 +11,11 @@ class SNMP::V3::Security
   class AuthenticationError < Error
   end
 
+  # Raised when an inbound authenticated message falls outside the RFC 3414
+  # time window — a replay, or a boots/clock mismatch with the remote engine.
+  class NotInTimeWindowError < AuthenticationError
+  end
+
   enum AuthProtocol
     MD5
     SHA # SHA-1

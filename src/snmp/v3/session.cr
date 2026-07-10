@@ -33,6 +33,13 @@ class SNMP::V3::Session
   # The 150 Seconds is specified in https://www.ietf.org/rfc/rfc2574.txt 2.2.3
   TIMELINESS_THRESHOLD = 140_i64
 
+  # RFC 3414 3.2.7 tolerated clock skew for inbound authenticated messages.
+  # Distinct from TIMELINESS_THRESHOLD above, which drives local re-probing.
+  TIME_WINDOW = 150
+
+  # The largest snmpEngineBoots value; reaching it forces a re-keying (RFC 3414 3.2.7).
+  MAX_ENGINE_BOOTS = 2147483647
+
   def must_revalidate?
     empty_id = @engine_id.empty?
     return true if empty_id
@@ -58,6 +65,41 @@ class SNMP::V3::Session
     # NOTE:: We don't pass in security here as we are probing for the engine ID
     probe = V3::Message.new(message.children, nil)
     validate probe
+  end
+
+  # Enforce the RFC 3414 3.2.7 time window on an inbound authenticated message
+  # and advance the local notion of the remote engine's (boots, time).
+  #
+  # Only authenticated messages carry a meaningful timeliness, and a baseline
+  # must already have been established (via discovery/`validate`); otherwise the
+  # call is a no-op. Raises `Security::NotInTimeWindowError` on a replayed or
+  # out-of-window message.
+  def check_timeliness(message : V3::Message) : Nil
+    return unless message.flags.authentication?
+    return if @timeliness.zero?
+
+    msg_boots = message.security_params.engine_boots
+    msg_time = message.security_params.engine_time
+
+    # 3.2.7a — advance the local LCD when the message is strictly more recent.
+    if msg_boots > @engine_boots || (msg_boots == @engine_boots && msg_time > @engine_time)
+      @engine_boots = msg_boots
+      @engine_time = msg_time
+      @timeliness = Time.monotonic.to_i
+    end
+
+    # 3.2.7b — reject anything outside the window against the (updated) LCD. The
+    # local estimate of the remote clock advances with our own monotonic clock.
+    estimated_time = @engine_time + (Time.monotonic.to_i - @timeliness)
+    outside = @engine_boots == MAX_ENGINE_BOOTS ||
+              msg_boots < @engine_boots ||
+              (msg_boots == @engine_boots && msg_time < estimated_time - TIME_WINDOW)
+
+    if outside
+      raise Security::NotInTimeWindowError.new(
+        "message outside the time window (boots=#{msg_boots} time=#{msg_time}; " \
+        "local boots=#{@engine_boots} time≈#{estimated_time})")
+    end
   end
 
   # Note:: only used when being queried
@@ -92,7 +134,11 @@ class SNMP::V3::Session
 
     raise SNMP::VersionError.new("SNMP version mismatch, expected V3 got #{version}") unless version == Version::V3
 
-    V3::Message.new(snmp, security)
+    # V3::Message.new verifies the HMAC first; only then is the timeliness of an
+    # authenticated message meaningful.
+    message = V3::Message.new(snmp, security)
+    check_timeliness(message) if security
+    message
   end
 
   def get(oid, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
