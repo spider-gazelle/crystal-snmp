@@ -149,8 +149,25 @@ class SNMP::V3::Session
     V3::Message.new(scoped_pdu, sec_params, @security, security_model, message_id)
   end
 
+  # Multi-varbind Get: one GetRequest carrying every OID (RFC 3416), answered by
+  # a single Response with N varbinds.
+  def get(oids : Enumerable(String), request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
+    varbinds = oids.map { |oid| VarBind.new(oid) }.to_a
+    pdu = PDU.new(request_id, varbinds)
+    scoped_pdu = ScopedPDU.new(Request::Get, pdu, @engine_id)
+    sec_params = SecurityParams.new(@security.username, @engine_id, @engine_boots, @engine_time)
+
+    V3::Message.new(scoped_pdu, sec_params, @security, security_model, message_id)
+  end
+
   def get_next(oid, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
     message = get(oid, request_id, message_id, security_model)
+    message.request = Request::GetNext
+    message
+  end
+
+  def get_next(oids : Enumerable(String), request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
+    message = get(oids, request_id, message_id, security_model)
     message.request = Request::GetNext
     message
   end

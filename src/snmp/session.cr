@@ -46,8 +46,21 @@ class SNMP::Session
     SNMP::Message.new(@community, Request::Get, VarBind.new(oid), request_id)
   end
 
+  # Multi-varbind Get: one GetRequest carrying every OID (RFC 3416 allows a PDU
+  # to bind several variables), answered by a single Response with N varbinds.
+  def get(oids : Enumerable(String), request_id = rand(2147483647))
+    varbinds = oids.map { |oid| VarBind.new(oid) }.to_a
+    SNMP::Message.new(@community, Request::Get, varbinds, request_id)
+  end
+
   def get_next(oid, request_id = rand(2147483647))
     message = get(oid, request_id)
+    message.request = Request::GetNext
+    message
+  end
+
+  def get_next(oids : Enumerable(String), request_id = rand(2147483647))
+    message = get(oids, request_id)
     message.request = Request::GetNext
     message
   end

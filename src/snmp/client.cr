@@ -68,10 +68,33 @@ class SNMP::Client
     msg
   end
 
+  # Multi-varbind Get: one round-trip binding every OID; the Response carries a
+  # varbind per requested OID.
+  def get(oids : Enumerable(String)) : SNMP::Message
+    msg : SNMP::Message? = nil
+    with_socket do |sock|
+      msg = get(oids, sock)
+    end
+
+    raise Error.new("Failed to read message") if msg.nil?
+    msg
+  end
+
   private def get(oid : String, sock : UDPSocket) : SNMP::Message
     check_validation_probe(sock)
 
     message = session.get(oid)
+    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
+
+    sock.write_bytes message
+    sock.flush
+    session.parse(sock.read_bytes(ASN1::BER))
+  end
+
+  private def get(oids : Enumerable(String), sock : UDPSocket) : SNMP::Message
+    check_validation_probe(sock)
+
+    message = session.get(oids)
     message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
 
     sock.write_bytes message
@@ -90,10 +113,33 @@ class SNMP::Client
     msg
   end
 
+  # Multi-varbind GetNext: advances every supplied OID in one round-trip.
+  def get_next(oids : Enumerable(String)) : SNMP::Message
+    msg : SNMP::Message? = nil
+
+    with_socket do |sock|
+      msg = get_next(oids, sock)
+    end
+
+    raise Error.new("Failed to read message") if msg.nil?
+    msg
+  end
+
   private def get_next(oid : String, sock : UDPSocket) : SNMP::Message
     check_validation_probe(sock)
 
     message = session.get_next(oid)
+    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
+
+    sock.write_bytes message
+    sock.flush
+    session.parse(sock.read_bytes(ASN1::BER))
+  end
+
+  private def get_next(oids : Enumerable(String), sock : UDPSocket) : SNMP::Message
+    check_validation_probe(sock)
+
+    message = session.get_next(oids)
     message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
 
     sock.write_bytes message
