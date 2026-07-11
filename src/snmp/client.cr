@@ -170,6 +170,51 @@ class SNMP::Client
     session.parse(sock.read_bytes(ASN1::BER))
   end
 
+  # Set a single OID to *value* (a typed SNMP value, a Crystal primitive, or a
+  # raw `ASN1::BER`) and return the agent's Response.
+  def set(oid : String, value) : SNMP::Message
+    msg : SNMP::Message? = nil
+    with_socket do |sock|
+      msg = set(oid, value, sock)
+    end
+
+    raise Error.new("Failed to read message") if msg.nil?
+    msg
+  end
+
+  # Multi-varbind Set: assign every OID => value pair in one round-trip.
+  def set(values : Hash(String, _)) : SNMP::Message
+    msg : SNMP::Message? = nil
+    with_socket do |sock|
+      msg = set(values, sock)
+    end
+
+    raise Error.new("Failed to read message") if msg.nil?
+    msg
+  end
+
+  private def set(oid : String, value, sock : UDPSocket) : SNMP::Message
+    check_validation_probe(sock)
+
+    message = session.set(oid, value)
+    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
+
+    sock.write_bytes message
+    sock.flush
+    session.parse(sock.read_bytes(ASN1::BER))
+  end
+
+  private def set(values : Hash(String, _), sock : UDPSocket) : SNMP::Message
+    check_validation_probe(sock)
+
+    message = session.set(values)
+    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
+
+    sock.write_bytes message
+    sock.flush
+    session.parse(sock.read_bytes(ASN1::BER))
+  end
+
   def walk(oid : String) : Array(SNMP::Message)
     messages = [] of SNMP::Message
     with_socket do |sock|

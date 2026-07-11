@@ -76,18 +76,30 @@ class SNMP::Session
     message
   end
 
-  # TODO:: requires better support for SNMP values such as Counter32, Counter64, Gauge32, OID, Timeticks etc
   def set(oid, value, request_id = rand(2147483647))
+    SNMP::Message.new(@community, Request::Set, to_varbind(oid, value), request_id)
+  end
+
+  # Multi-varbind Set: one SetRequest assigning every OID => value pair. The Hash
+  # keeps insertion order, so the varbinds go out in the order they were given.
+  def set(values : Hash(String, _), request_id = rand(2147483647))
+    varbinds = values.map { |oid, value| to_varbind(oid, value) }
+    SNMP::Message.new(@community, Request::Set, varbinds, request_id)
+  end
+
+  # Encode a single OID => value assignment into a VarBind. Accepts the typed
+  # SNMP values (`TypedValue`), the Crystal primitives, a raw `ASN1::BER`, or a
+  # pre-built `VarBind`.
+  private def to_varbind(oid, value) : VarBind
     data = value.is_a?(VarBind) ? value : VarBind.new(oid)
 
     case value
+    when TypedValue
+      data.value = value.to_ber
     when String
       data.value.set_string(value)
     when Int
       data.value.set_integer(value)
-      # TODO::
-      # when Float
-      # when Socket::IPAddress
     when Bool
       data.value.set_boolean(value)
     when Nil
@@ -100,6 +112,6 @@ class SNMP::Session
       raise ArgumentError.new("unsupported varbind value. For complex values pass a pre-constructed `ASN1::BER`")
     end
 
-    SNMP::Message.new(@community, Request::Set, data, request_id)
+    data
   end
 end
