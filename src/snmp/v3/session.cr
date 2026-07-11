@@ -67,6 +67,18 @@ class SNMP::V3::Session
     validate probe
   end
 
+  # Re-sync the local engine identity / clock from an authoritative message
+  # (typically a usmStats Report), so a retried request carries fresh values.
+  # The engine id is only overwritten when the message actually carries one.
+  def resync_from(message : V3::Message)
+    engine_id = message.security_params.engine_id
+    @security.engine_id = @engine_id = engine_id unless engine_id.empty?
+    @engine_boots = message.security_params.engine_boots
+    @engine_time = message.security_params.engine_time
+    @timeliness = Time.monotonic.to_i
+    self
+  end
+
   # Enforce the RFC 3414 3.2.7 time window on an inbound authenticated message
   # and advance the local notion of the remote engine's (boots, time).
   #
