@@ -81,25 +81,11 @@ class SNMP::Client
   end
 
   private def get(oid : String, sock : UDPSocket) : SNMP::Message
-    check_validation_probe(sock)
-
-    message = session.get(oid)
-    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
-
-    sock.write_bytes message
-    sock.flush
-    session.parse(sock.read_bytes(ASN1::BER))
+    request(sock) { session.get(oid) }
   end
 
   private def get(oids : Enumerable(String), sock : UDPSocket) : SNMP::Message
-    check_validation_probe(sock)
-
-    message = session.get(oids)
-    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
-
-    sock.write_bytes message
-    sock.flush
-    session.parse(sock.read_bytes(ASN1::BER))
+    request(sock) { session.get(oids) }
   end
 
   def get_next(oid : String) : SNMP::Message
@@ -126,25 +112,11 @@ class SNMP::Client
   end
 
   private def get_next(oid : String, sock : UDPSocket) : SNMP::Message
-    check_validation_probe(sock)
-
-    message = session.get_next(oid)
-    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
-
-    sock.write_bytes message
-    sock.flush
-    session.parse(sock.read_bytes(ASN1::BER))
+    request(sock) { session.get_next(oid) }
   end
 
   private def get_next(oids : Enumerable(String), sock : UDPSocket) : SNMP::Message
-    check_validation_probe(sock)
-
-    message = session.get_next(oids)
-    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
-
-    sock.write_bytes message
-    sock.flush
-    session.parse(sock.read_bytes(ASN1::BER))
+    request(sock) { session.get_next(oids) }
   end
 
   # GetBulk: one round-trip returning up to *max_repetitions* successors per
@@ -160,14 +132,7 @@ class SNMP::Client
   end
 
   private def get_bulk(oids : Enumerable(String), sock : UDPSocket, non_repeaters, max_repetitions) : SNMP::Message
-    check_validation_probe(sock)
-
-    message = session.get_bulk(oids, non_repeaters, max_repetitions)
-    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
-
-    sock.write_bytes message
-    sock.flush
-    session.parse(sock.read_bytes(ASN1::BER))
+    request(sock) { session.get_bulk(oids, non_repeaters, max_repetitions) }
   end
 
   # Set a single OID to *value* (a typed SNMP value, a Crystal primitive, or a
@@ -194,25 +159,11 @@ class SNMP::Client
   end
 
   private def set(oid : String, value, sock : UDPSocket) : SNMP::Message
-    check_validation_probe(sock)
-
-    message = session.set(oid, value)
-    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
-
-    sock.write_bytes message
-    sock.flush
-    session.parse(sock.read_bytes(ASN1::BER))
+    request(sock) { session.set(oid, value) }
   end
 
   private def set(values : Hash(String, _), sock : UDPSocket) : SNMP::Message
-    check_validation_probe(sock)
-
-    message = session.set(values)
-    message = session.prepare(message) if message.is_a?(SNMP::V3::Message)
-
-    sock.write_bytes message
-    sock.flush
-    session.parse(sock.read_bytes(ASN1::BER))
+    request(sock) { session.set(values) }
   end
 
   def walk(oid : String) : Array(SNMP::Message)
@@ -289,5 +240,39 @@ class SNMP::Client
       sock.flush
       session.validate sock.read_bytes(ASN1::BER)
     end
+  end
+
+  # Build a fresh request, send it, and return the parsed response — transparently
+  # recovering from a recoverable v3 usmStats Report (notInTimeWindow /
+  # unknownEngineID) by resyncing the engine params and retrying exactly once.
+  # A non-recoverable Report, or a Report that survives the retry, raises
+  # `Security::ReportError`. The block is re-invoked on retry so the rebuilt
+  # request carries the freshly synced engine boots/time/id.
+  private def request(sock, &build : -> SNMP::Message) : SNMP::Message
+    check_validation_probe(sock)
+    response = transceive(sock, build.call)
+
+    sess = session
+    if response.is_a?(SNMP::V3::Message) && response.report? && sess.is_a?(SNMP::V3::Session)
+      stat = response.usm_stat
+      if stat.try(&.resyncable?)
+        sess.resync_from(response)
+        response = transceive(sock, build.call)
+      end
+
+      if response.is_a?(SNMP::V3::Message) && response.report?
+        raise SNMP::V3::Security::ReportError.new(
+          "agent returned a usmStats Report (#{response.usm_stat || "unknown"})", response.usm_stat)
+      end
+    end
+
+    response
+  end
+
+  private def transceive(sock, message : SNMP::Message) : SNMP::Message
+    payload = message.is_a?(SNMP::V3::Message) ? session.prepare(message) : message
+    sock.write_bytes payload
+    sock.flush
+    session.parse(sock.read_bytes(ASN1::BER))
   end
 end
