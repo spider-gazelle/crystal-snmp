@@ -140,6 +140,9 @@ class SNMP::V3::Session
     message.to_ber(encrypted_pdu)
   end
 
+  # Decode a v3 message, rejecting any other version. *security* defaults to this
+  # session's so the HMAC is verified and the message timeliness checked; pass
+  # `nil` to decode without verification (e.g. an engine-discovery probe).
   def parse(message : ASN1::BER, security = @security) : V3::Message
     snmp = SNMP.ber_fields(message, 1, "SNMP message")
     version = SNMP.decode_enum(Version, snmp[0].get_integer, "SNMP version")

@@ -98,6 +98,9 @@ class SNMP
     Counter64 = 6
   end
 
+  # Version-dispatching factory: decode any SNMP message, returning a `V3::Message`
+  # for v3 and a `Message` otherwise. Use `Session#parse` / `V3::Session#parse`
+  # instead when you already know the version and want it validated.
   def self.parse(message : ASN1::BER, security = nil) : Message | V3::Message
     snmp = ber_fields(message, 1, "SNMP message")
     version = decode_enum(Version, snmp[0].get_integer, "SNMP version")
