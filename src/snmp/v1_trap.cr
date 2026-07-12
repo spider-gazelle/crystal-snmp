@@ -24,4 +24,25 @@ class SNMP::V1Trap < SNMP::Trap
   def initialize(@agent_address, @generic_trap, @specific_trap, **args)
     super(**args)
   end
+
+  # RFC 1157 Trap-PDU wire structure — distinct from the standard PDU layout, so
+  # this overrides `PDU#to_ber`. `@oid` holds the enterprise OID.
+  def to_ber(tag_number)
+    enterprise = ASN1::BER.new.set_object_id(@oid)
+    agent = IpAddress.new(@agent_address).to_ber
+    generic = ASN1::BER.new.set_integer(@generic_trap.to_i)
+    specific = ASN1::BER.new.set_integer(@specific_trap)
+    timestamp = TimeTicks.new(@time_ticks).to_ber
+
+    varb = ASN1::BER.new
+    varb.tag_number = ASN1::BER::UniversalTags::Sequence
+    varb.children = varbinds.map &.to_ber
+
+    pdu = ASN1::BER.new
+    pdu.tag_class = ASN1::BER::TagClass::ContextSpecific
+    pdu.constructed = true
+    pdu.tag_number = tag_number
+    pdu.children = {enterprise, agent, generic, specific, timestamp, varb}
+    pdu
+  end
 end

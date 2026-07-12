@@ -25,6 +25,10 @@ class SNMP::Message
     @pdu = PDU.new(request_id, varbind, error_status, error_index)
   end
 
+  # Wrap a pre-built PDU (e.g. a `V1Trap` with its own wire structure).
+  def initialize(@community, @request, @pdu : PDU, @version = Version::V2C)
+  end
+
   getter pdu : PDU | Trap | V1Trap
   property version : Version
   property request : Request
