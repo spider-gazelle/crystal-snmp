@@ -2,6 +2,7 @@ require "./session"
 require "./security"
 require "./scoped_pdu"
 require "./security_params"
+require "./report"
 
 class SNMP::V3::Message < SNMP::Message
   def initialize(snmp : Array(ASN1::BER), security = nil)
@@ -75,6 +76,18 @@ class SNMP::V3::Message < SNMP::Message
   property security_model : SecurityModel
   property security_params : SecurityParams
   property scoped_pdu : ScopedPDU
+
+  # True if this is a Report PDU (RFC 3412 6.2.6) — the agent's error report.
+  def report? : Bool
+    @request == Request::Report
+  end
+
+  # The usmStats counter this Report names, or nil if it is not a usmStats Report.
+  def usm_stat : UsmStat?
+    return nil unless report?
+    oid = @pdu.varbinds.first?.try(&.oid)
+    oid ? UsmStat.from_oid?(oid) : nil
+  end
 
   def engine_id
     @security_params.engine_id

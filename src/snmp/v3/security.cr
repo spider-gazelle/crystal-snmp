@@ -16,6 +16,17 @@ class SNMP::V3::Security
   class NotInTimeWindowError < AuthenticationError
   end
 
+  # Raised when the agent returns a usmStats Report PDU that cannot be recovered
+  # by a resync/retry (e.g. wrongDigest, unknownUserName), or when a resyncable
+  # Report is still returned after the retry.
+  class ReportError < Error
+    getter usm_stat : V3::UsmStat?
+
+    def initialize(message, @usm_stat = nil)
+      super(message)
+    end
+  end
+
   enum AuthProtocol
     MD5
     SHA # SHA-1
