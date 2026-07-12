@@ -52,9 +52,9 @@ class SNMP::V3::Message < SNMP::Message
     @pdu = @scoped_pdu.pdu
   end
 
-  def initialize(@scoped_pdu : ScopedPDU, @security_params : SecurityParams, security : Security? = nil, @security_model = SecurityModel::USM, @id = rand(2147483647))
+  def initialize(@scoped_pdu : ScopedPDU, @security_params : SecurityParams, security : Security? = nil, @security_model = SecurityModel::USM, @id = rand(REQUEST_ID_RANGE))
     @version = Version::V3
-    @max_size = 65507
+    @max_size = MAX_MESSAGE_SIZE
     if security
       @flags = security.security_level | MessageFlags::Reportable
     else
@@ -116,11 +116,15 @@ class SNMP::V3::Message < SNMP::Message
 
   def new_request_id
     @pdu.new_request_id
-    @id = rand(2147483647)
+    @id = rand(REQUEST_ID_RANGE)
   end
 
+  # Largest UDP payload (65535 - 20-byte IP - 8-byte UDP header) — advertised as
+  # msgMaxSize, the biggest response this engine will accept.
+  MAX_MESSAGE_SIZE = 65507
+
   PRIVNONE     = ASN1::BER.new.set_string("", tag: UniversalTags::OctetString)
-  MSG_MAX_SIZE = ASN1::BER.new.set_integer(65507)
+  MSG_MAX_SIZE = ASN1::BER.new.set_integer(MAX_MESSAGE_SIZE)
   MSG_VERSION  = ASN1::BER.new.set_integer(Version::V3.to_i)
 
   def verify(security, scoped_pdu = @scoped_pdu.to_ber)

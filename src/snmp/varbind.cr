@@ -10,6 +10,34 @@ class SNMP::VarBind
     @value.tag_number = tag_number
   end
 
+  # Build a VarBind assigning *value* to *oid*. Accepts a typed SNMP value
+  # (`TypedValue`), a Crystal primitive, a raw `ASN1::BER`, or a pre-built
+  # `VarBind` (whose OID is then set to *oid*).
+  def self.from_value(oid, value) : VarBind
+    data = value.is_a?(VarBind) ? value : VarBind.new(oid)
+
+    case value
+    when TypedValue
+      data.value = value.to_ber
+    when String
+      data.value.set_string(value)
+    when Int
+      data.value.set_integer(value)
+    when Bool
+      data.value.set_boolean(value)
+    when Nil
+      data.value.tag_number = UniversalTags::Null
+    when ASN1::BER
+      data.value = value
+    when VarBind
+      data.oid = oid
+    else
+      raise ArgumentError.new("unsupported varbind value. For complex values pass a pre-constructed `ASN1::BER`")
+    end
+
+    data
+  end
+
   property oid : String
   property value : ASN1::BER
 
@@ -61,8 +89,6 @@ class SNMP::VarBind
     no_such_object? || no_such_instance? || end_of_mib_view?
   end
 
-  # Proxy missing methods to the BER value
-  macro method_missing(call)
-    self.value.{{call.name.id}}({{*call.args}})
-  end
+  # Proxy missing methods (with their arguments and block) to the BER value.
+  forward_missing_to value
 end

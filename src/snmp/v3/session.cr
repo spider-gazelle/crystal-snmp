@@ -21,8 +21,9 @@ class SNMP::V3::Session
 
   getter security : V3::Security
   getter engine_id : String
-  getter timeliness : Int64 = 0_i64
-  getter session_created : Int64 = 0_i64
+  # Monotonic instant of the last engine sync / session start (nil = never synced).
+  getter timeliness : Time::Instant?
+  getter session_created : Time::Instant?
   getter engine_time : Int32
   getter engine_boots : Int32
 
@@ -44,7 +45,7 @@ class SNMP::V3::Session
     empty_id = @engine_id.empty?
     return true if empty_id
     return empty_id if @security.security_level == MessageFlags::None
-    (Time.monotonic.to_i - @timeliness) >= TIMELINESS_THRESHOLD
+    (ts = @timeliness).nil? || ts.elapsed >= TIMELINESS_THRESHOLD.seconds
   end
 
   def engine_validation_probe : V3::Message
@@ -57,7 +58,7 @@ class SNMP::V3::Session
     @security.engine_id = @engine_id = message.community
     @engine_boots = message.security_params.engine_boots
     @engine_time = message.security_params.engine_time
-    @timeliness = Time.monotonic.to_i
+    @timeliness = Time.instant
     self
   end
 
@@ -75,7 +76,7 @@ class SNMP::V3::Session
     @security.engine_id = @engine_id = engine_id unless engine_id.empty?
     @engine_boots = message.security_params.engine_boots
     @engine_time = message.security_params.engine_time
-    @timeliness = Time.monotonic.to_i
+    @timeliness = Time.instant
     self
   end
 
@@ -88,7 +89,7 @@ class SNMP::V3::Session
   # out-of-window message.
   def check_timeliness(message : V3::Message) : Nil
     return unless message.flags.authentication?
-    return if @timeliness.zero?
+    return if @timeliness.nil?
 
     msg_boots = message.security_params.engine_boots
     msg_time = message.security_params.engine_time
@@ -97,12 +98,14 @@ class SNMP::V3::Session
     if msg_boots > @engine_boots || (msg_boots == @engine_boots && msg_time > @engine_time)
       @engine_boots = msg_boots
       @engine_time = msg_time
-      @timeliness = Time.monotonic.to_i
+      @timeliness = Time.instant
     end
 
     # 3.2.7b — reject anything outside the window against the (updated) LCD. The
     # local estimate of the remote clock advances with our own monotonic clock.
-    estimated_time = @engine_time + (Time.monotonic.to_i - @timeliness)
+    synced_at = @timeliness
+    elapsed = synced_at.nil? ? 0 : synced_at.elapsed.total_seconds.to_i
+    estimated_time = @engine_time + elapsed
     outside = @engine_boots == MAX_ENGINE_BOOTS ||
               msg_boots < @engine_boots ||
               (msg_boots == @engine_boots && msg_time < estimated_time - TIME_WINDOW)
@@ -118,11 +121,12 @@ class SNMP::V3::Session
   def reboot
     @engine_boots += 1
     @engine_time = 0
-    @session_created = Time.monotonic.to_i
+    @session_created = Time.instant
   end
 
   def update_time
-    @engine_time = (Time.monotonic.to_i - @session_created).to_i
+    started_at = @session_created
+    @engine_time = started_at.nil? ? 0 : started_at.elapsed.total_seconds.to_i
   end
 
   def prepare(message : V3::Message) : ASN1::BER
@@ -156,7 +160,7 @@ class SNMP::V3::Session
     message
   end
 
-  def get(oid, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
+  def get(oid, request_id = rand(REQUEST_ID_RANGE), message_id = rand(REQUEST_ID_RANGE), security_model = @security.security_model)
     pdu = PDU.new(request_id, VarBind.new(oid))
     scoped_pdu = ScopedPDU.new(Request::Get, pdu, @engine_id)
     sec_params = SecurityParams.new(@security.username, @engine_id, @engine_boots, @engine_time)
@@ -166,7 +170,7 @@ class SNMP::V3::Session
 
   # Multi-varbind Get: one GetRequest carrying every OID (RFC 3416), answered by
   # a single Response with N varbinds.
-  def get(oids : Enumerable(String), request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
+  def get(oids : Enumerable(String), request_id = rand(REQUEST_ID_RANGE), message_id = rand(REQUEST_ID_RANGE), security_model = @security.security_model)
     varbinds = oids.map { |oid| VarBind.new(oid) }.to_a
     pdu = PDU.new(request_id, varbinds)
     scoped_pdu = ScopedPDU.new(Request::Get, pdu, @engine_id)
@@ -175,13 +179,13 @@ class SNMP::V3::Session
     V3::Message.new(scoped_pdu, sec_params, @security, security_model, message_id)
   end
 
-  def get_next(oid, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
+  def get_next(oid, request_id = rand(REQUEST_ID_RANGE), message_id = rand(REQUEST_ID_RANGE), security_model = @security.security_model)
     message = get(oid, request_id, message_id, security_model)
     message.request = Request::GetNext
     message
   end
 
-  def get_next(oids : Enumerable(String), request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
+  def get_next(oids : Enumerable(String), request_id = rand(REQUEST_ID_RANGE), message_id = rand(REQUEST_ID_RANGE), security_model = @security.security_model)
     message = get(oids, request_id, message_id, security_model)
     message.request = Request::GetNext
     message
@@ -189,7 +193,7 @@ class SNMP::V3::Session
 
   # GetBulk (RFC 3416): up to *max_repetitions* successors per repeating varbind
   # in one round-trip; the first *non_repeaters* OIDs act as plain GetNext.
-  def get_bulk(oids : Enumerable(String), non_repeaters = 0, max_repetitions = 10, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
+  def get_bulk(oids : Enumerable(String), non_repeaters = 0, max_repetitions = 10, request_id = rand(REQUEST_ID_RANGE), message_id = rand(REQUEST_ID_RANGE), security_model = @security.security_model)
     varbinds = oids.map { |oid| VarBind.new(oid) }.to_a
     pdu = PDU.new(request_id, varbinds)
     pdu.non_repeaters = non_repeaters
@@ -200,14 +204,14 @@ class SNMP::V3::Session
     V3::Message.new(scoped_pdu, sec_params, @security, security_model, message_id)
   end
 
-  def set(oid, value, request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
-    build_set([to_varbind(oid, value)], request_id, message_id, security_model)
+  def set(oid, value, request_id = rand(REQUEST_ID_RANGE), message_id = rand(REQUEST_ID_RANGE), security_model = @security.security_model)
+    build_set([VarBind.from_value(oid, value)], request_id, message_id, security_model)
   end
 
   # Multi-varbind Set: one SetRequest assigning every OID => value pair (Hash
   # keeps insertion order).
-  def set(values : Hash(String, _), request_id = rand(2147483647), message_id = rand(2147483647), security_model = @security.security_model)
-    build_set(values.map { |oid, value| to_varbind(oid, value) }, request_id, message_id, security_model)
+  def set(values : Hash(String, _), request_id = rand(REQUEST_ID_RANGE), message_id = rand(REQUEST_ID_RANGE), security_model = @security.security_model)
+    build_set(values.map { |oid, value| VarBind.from_value(oid, value) }, request_id, message_id, security_model)
   end
 
   private def build_set(varbinds : Array(VarBind), request_id, message_id, security_model) : V3::Message
@@ -216,31 +220,5 @@ class SNMP::V3::Session
     sec_params = SecurityParams.new(@security.username, @engine_id, @engine_boots, @engine_time)
 
     V3::Message.new(scoped_pdu, sec_params, @security, security_model, message_id)
-  end
-
-  # Encode a single OID => value assignment into a VarBind (see `Session#to_varbind`).
-  private def to_varbind(oid, value) : VarBind
-    data = value.is_a?(VarBind) ? value : VarBind.new(oid)
-
-    case value
-    when TypedValue
-      data.value = value.to_ber
-    when String
-      data.value.set_string(value)
-    when Int
-      data.value.set_integer(value)
-    when Bool
-      data.value.set_boolean(value)
-    when Nil
-      data.value.tag_number = UniversalTags::Null
-    when ASN1::BER
-      data.value = value
-    when VarBind
-      data.oid = oid
-    else
-      raise ArgumentError.new("unsupported varbind value. For complex values pass a pre-constructed `ASN1::BER`")
-    end
-
-    data
   end
 end

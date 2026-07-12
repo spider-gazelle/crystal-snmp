@@ -37,8 +37,8 @@ class SNMP::V3::Security::DES
   end
 
   def decrypt(encrypted_data : Bytes, salt : Bytes, engine_boots = nil, engine_time = nil)
-    raise "invalid priv salt received" unless (salt.size % 8).zero?
-    raise "invalid encrypted PDU received" unless (encrypted_data.size % 8).zero?
+    raise SNMP::ParseError.new("invalid priv salt received") unless (salt.size % 8).zero?
+    raise SNMP::ParseError.new("invalid encrypted PDU received") unless (encrypted_data.size % 8).zero?
 
     cipher = OpenSSL::Cipher.new("des-cbc")
     cipher.padding = false

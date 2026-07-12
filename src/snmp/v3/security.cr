@@ -219,20 +219,24 @@ class SNMP::V3::Security
     @digest.final
   end
 
+  # RFC 3414 A.2 expands the password to 2^20 octets, hashed in 64-byte chunks.
+  PASSKEY_EXPANSION_SIZE = 1 << 20
+  PASSKEY_CHUNK_SIZE     = 64
+
   def passkey(password)
     @digest.reset
 
-    # RFC 3414 A.2 expands the password (a sequence of octets) to 2^20 bytes by
-    # cycling through it, then hashes the stream. Feed it in a single reused
-    # 64-byte chunk indexed cyclically, instead of allocating two Strings per
-    # iteration (the old rotated/buffer concats) × 16384 iterations.
+    # Expand the password (a sequence of octets) to PASSKEY_EXPANSION_SIZE by
+    # cycling through it, then hash the stream. Feed it in a single reused chunk
+    # indexed cyclically, instead of allocating two Strings per iteration (the
+    # old rotated/buffer concats) × 16384 iterations.
     bytes = password.to_slice
     length = bytes.size
-    buffer = Bytes.new(64)
+    buffer = Bytes.new(PASSKEY_CHUNK_SIZE)
     offset = 0
 
-    (1048576 // 64).times do
-      64.times do |i|
+    (PASSKEY_EXPANSION_SIZE // PASSKEY_CHUNK_SIZE).times do
+      PASSKEY_CHUNK_SIZE.times do |i|
         buffer[i] = bytes[offset]
         offset += 1
         offset = 0 if offset == length
