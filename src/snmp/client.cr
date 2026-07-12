@@ -7,7 +7,9 @@ class SNMP::Client
 
   getter socket : UDPSocket
   getter session : SNMP::Session | SNMP::V3::Session
-  getter host, timeout, port
+  getter host : String
+  getter timeout : Int32
+  getter port : Int32
 
   def initialize(@host : String, community = "public", @timeout = 3, @port = 161)
     @socket = UDPSocket.new
