@@ -213,7 +213,7 @@ class SNMP::Client
       # While the message is not nil and the returned oid is a child of the request
       while !msg.nil? && self.class.oid_within?(msg.oid, oid)
         # Stop at the RFC 3416 endOfMibView exception (not merely an empty value).
-        break if msg.value.end_of_mib_view?
+        break if msg.varbind.end_of_mib_view?
 
         messages << msg
         msg = get_next(msg.oid, sock)
@@ -229,7 +229,7 @@ class SNMP::Client
       # While the message is not nil and the returned oid is a child of the request
       while !msg.nil? && self.class.oid_within?(msg.oid, oid)
         # Stop at the RFC 3416 endOfMibView exception (not merely an empty value).
-        break if msg.value.end_of_mib_view?
+        break if msg.varbind.end_of_mib_view?
 
         yield msg
         msg = get_next(msg.oid, sock)

@@ -59,6 +59,11 @@ class SNMP::Message
     @pdu.oid
   end
 
+  # shortcut for `.varbinds[0]`
+  def varbind
+    @pdu.varbind
+  end
+
   # shortcut for `.varbinds[0].value`
   def value
     @pdu.value

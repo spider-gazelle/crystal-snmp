@@ -39,9 +39,14 @@ class SNMP::PDU
     @varbinds[0].oid
   end
 
+  # shortcut for `.varbinds[0]`
+  def varbind
+    @varbinds[0]
+  end
+
   # shortcut for `.varbinds[0].value`
   def value
-    @varbinds[0]
+    @varbinds[0].value
   end
 
   def to_ber(tag_number)
