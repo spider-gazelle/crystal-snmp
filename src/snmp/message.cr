@@ -69,11 +69,6 @@ class SNMP::Message
     @pdu.value
   end
 
-  # Builds a response object based on the current request
-  def build_reply
-    self.class.new(@community, Request::Response, request_id: @pdu.request_id, version: @version)
-  end
-
   def new_request_id
     @pdu.new_request_id
   end
