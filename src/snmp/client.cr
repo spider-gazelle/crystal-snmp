@@ -13,11 +13,19 @@ class SNMP::Client
 
   def initialize(@host : String, community = "public", @timeout = 3, @port = 161)
     @socket = build_socket
+    @connected = false
     @session = SNMP::Session.new(community: community)
   end
 
   def initialize(@host : String, @session : SNMP::Session | SNMP::V3::Session, @timeout = 3, @port = 161)
     @socket = build_socket
+    @connected = false
+  end
+
+  # Close the underlying UDP socket. The next request reconnects transparently.
+  # A `Client` is not safe for concurrent use — use one per fiber.
+  def close : Nil
+    reset_socket
   end
 
   # A fresh, buffered UDP socket with the configured read timeout.
@@ -36,19 +44,37 @@ class SNMP::Client
   end
 
   private def with_socket(&)
-    @socket = build_socket if socket.closed?
-    socket.connect(host, port)
+    sock = connected_socket
     begin
-      yield socket
+      yield sock
     rescue ex : IO::TimeoutError
+      reset_socket
       raise SNMP::TimeoutError.new("no response from #{host}:#{port} within #{timeout}s", cause: ex)
     rescue ex : BinData::ParseError
       # A read timeout surfaces here as a BinData::ParseError wrapping IO::TimeoutError
+      reset_socket
       raise SNMP::TimeoutError.new("no response from #{host}:#{port} within #{timeout}s", cause: ex) if timed_out?(ex)
       raise SNMP::ParseError.new("failed to decode SNMP response from #{host}:#{port}: #{ex.message}", cause: ex)
-    ensure
-      socket.close
     end
+  end
+
+  # The persistent socket, connected on first use and reused across requests
+  # (avoids a connect+close and a new source port on every call).
+  private def connected_socket : UDPSocket
+    if socket.closed?
+      @socket = build_socket
+      @connected = false
+    end
+    unless @connected
+      socket.connect(host, port)
+      @connected = true
+    end
+    socket
+  end
+
+  private def reset_socket : Nil
+    socket.close unless socket.closed?
+    @connected = false
   end
 
   private def timed_out?(error : Exception) : Bool
@@ -207,20 +233,11 @@ class SNMP::Client
     end
   end
 
+  # Collect a subtree into an array. NOTE: this buffers every message in memory;
+  # for large subtrees prefer the block form below or `#bulk_walk`, which stream.
   def walk(oid : String) : Array(SNMP::Message)
     messages = [] of SNMP::Message
-    with_socket do |sock|
-      msg = get_next(oid, sock)
-
-      # While the message is not nil and the returned oid is a child of the request
-      while !msg.nil? && self.class.oid_within?(msg.oid, oid)
-        # Stop at the RFC 3416 endOfMibView exception (not merely an empty value).
-        break if msg.varbind.end_of_mib_view?
-
-        messages << msg
-        msg = get_next(msg.oid, sock)
-      end
-    end
+    walk(oid) { |msg| messages << msg }
     messages
   end
 
