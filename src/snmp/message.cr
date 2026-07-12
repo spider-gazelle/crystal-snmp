@@ -59,14 +59,14 @@ class SNMP::Message
     @pdu.oid
   end
 
+  # shortcut for `.varbinds[0]`
+  def varbind
+    @pdu.varbind
+  end
+
   # shortcut for `.varbinds[0].value`
   def value
     @pdu.value
-  end
-
-  # Builds a response object based on the current request
-  def build_reply
-    self.class.new(@community, Request::Response, request_id: @pdu.request_id, version: @version)
   end
 
   def new_request_id

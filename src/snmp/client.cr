@@ -7,19 +7,25 @@ class SNMP::Client
 
   getter socket : UDPSocket
   getter session : SNMP::Session | SNMP::V3::Session
-  getter host, timeout, port
+  getter host : String
+  getter timeout : Int32
+  getter port : Int32
 
   def initialize(@host : String, community = "public", @timeout = 3, @port = 161)
-    @socket = UDPSocket.new
-    socket.sync = false
-    socket.read_timeout = timeout
+    @socket = build_socket
     @session = SNMP::Session.new(community: community)
   end
 
   def initialize(@host : String, @session : SNMP::Session | SNMP::V3::Session, @timeout = 3, @port = 161)
-    @socket = UDPSocket.new
+    @socket = build_socket
+  end
+
+  # A fresh, buffered UDP socket with the configured read timeout.
+  private def build_socket : UDPSocket
+    socket = UDPSocket.new
     socket.sync = false
     socket.read_timeout = timeout
+    socket
   end
 
   # True when *oid* is the *base* subtree or a descendant of it. Compares OID
@@ -30,11 +36,7 @@ class SNMP::Client
   end
 
   private def with_socket(&)
-    if socket.closed?
-      @socket = UDPSocket.new
-      socket.sync = false
-      socket.read_timeout = timeout
-    end
+    @socket = build_socket if socket.closed?
     socket.connect(host, port)
     begin
       yield socket
@@ -213,7 +215,7 @@ class SNMP::Client
       # While the message is not nil and the returned oid is a child of the request
       while !msg.nil? && self.class.oid_within?(msg.oid, oid)
         # Stop at the RFC 3416 endOfMibView exception (not merely an empty value).
-        break if msg.value.end_of_mib_view?
+        break if msg.varbind.end_of_mib_view?
 
         messages << msg
         msg = get_next(msg.oid, sock)
@@ -229,7 +231,7 @@ class SNMP::Client
       # While the message is not nil and the returned oid is a child of the request
       while !msg.nil? && self.class.oid_within?(msg.oid, oid)
         # Stop at the RFC 3416 endOfMibView exception (not merely an empty value).
-        break if msg.value.end_of_mib_view?
+        break if msg.varbind.end_of_mib_view?
 
         yield msg
         msg = get_next(msg.oid, sock)

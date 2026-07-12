@@ -33,6 +33,8 @@ class SNMP::Session
     message.to_ber
   end
 
+  # Decode a v1/v2c message, rejecting a v3 one. The *security* parameter is
+  # accepted for signature parity with `V3::Session#parse` but is unused here.
   def parse(message : ASN1::BER, security = nil) : SNMP::Message
     snmp = SNMP.ber_fields(message, 1, "SNMP message")
     version = SNMP.decode_enum(Version, snmp[0].get_integer, "SNMP version")

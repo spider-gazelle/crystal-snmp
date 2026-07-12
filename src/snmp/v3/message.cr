@@ -89,6 +89,10 @@ class SNMP::V3::Message < SNMP::Message
     oid ? UsmStat.from_oid?(oid) : nil
   end
 
+  # In SNMPv3 the authoritative engine id plays the role the community string
+  # plays in v1/v2c. `engine_id` is the meaningful accessor here; the inherited
+  # `community` field is kept in sync only so code shared with `SNMP::Message`
+  # (which reads `#community`) keeps working — prefer `engine_id` in v3 code.
   def engine_id
     @security_params.engine_id
   end
@@ -97,6 +101,7 @@ class SNMP::V3::Message < SNMP::Message
     @security_params.engine_id = @community = id
   end
 
+  # Mirrors `engine_id=` — see the note above; kept for `SNMP::Message` compatibility.
   def community=(id)
     @security_params.engine_id = @community = id
   end
