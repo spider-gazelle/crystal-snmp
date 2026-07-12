@@ -207,20 +207,11 @@ class SNMP::Client
     end
   end
 
+  # Collect a subtree into an array. NOTE: this buffers every message in memory;
+  # for large subtrees prefer the block form below or `#bulk_walk`, which stream.
   def walk(oid : String) : Array(SNMP::Message)
     messages = [] of SNMP::Message
-    with_socket do |sock|
-      msg = get_next(oid, sock)
-
-      # While the message is not nil and the returned oid is a child of the request
-      while !msg.nil? && self.class.oid_within?(msg.oid, oid)
-        # Stop at the RFC 3416 endOfMibView exception (not merely an empty value).
-        break if msg.varbind.end_of_mib_view?
-
-        messages << msg
-        msg = get_next(msg.oid, sock)
-      end
-    end
+    walk(oid) { |msg| messages << msg }
     messages
   end
 
