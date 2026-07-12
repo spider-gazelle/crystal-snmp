@@ -80,6 +80,38 @@ class SNMP::Session
     SNMP::Message.new(@community, Request::Set, to_varbind(oid, value), request_id)
   end
 
+  # Standard first two varbinds of an SNMPv2 notification (RFC 3416 4.2.6).
+  SYS_UPTIME_OID    = "1.3.6.1.2.1.1.3.0"
+  SNMP_TRAP_OID_OID = "1.3.6.1.6.3.1.1.4.1.0"
+
+  # Build an SNMPv2-Trap: sysUpTime.0 + snmpTrapOID.0 followed by *varbinds*.
+  def trap_v2(oid, uptime = 0, varbinds : Array(VarBind) = [] of VarBind, request_id = rand(2147483647))
+    SNMP::Message.new(@community, Request::V2_Trap, notification_varbinds(oid, uptime, varbinds), request_id)
+  end
+
+  # Build an Inform (same shape as a v2 trap, but confirmed by the receiver).
+  def inform(oid, uptime = 0, varbinds : Array(VarBind) = [] of VarBind, request_id = rand(2147483647))
+    SNMP::Message.new(@community, Request::Inform, notification_varbinds(oid, uptime, varbinds), request_id)
+  end
+
+  # Build an RFC 1157 SNMPv1 Trap (its own wire structure). *enterprise* is the
+  # enterprise OID, *agent_address* a dotted-quad IPv4 string.
+  def trap_v1(enterprise, agent_address, generic_trap : GenericTrap, specific_trap = 0, uptime = 0, varbinds : Array(VarBind) = [] of VarBind, request_id = rand(2147483647))
+    pdu = V1Trap.new(agent_address, generic_trap, specific_trap.to_i32,
+      oid: enterprise, time_ticks: uptime.to_u32, varbinds: varbinds, request_id: request_id)
+    SNMP::Message.new(@community, Request::V1_Trap, pdu, version: Version::V1)
+  end
+
+  private def notification_varbinds(oid, uptime, extra : Array(VarBind)) : Array(VarBind)
+    uptime_vb = VarBind.new(SYS_UPTIME_OID)
+    uptime_vb.value = TimeTicks.new(uptime.to_u32).to_ber
+
+    trap_oid_vb = VarBind.new(SNMP_TRAP_OID_OID)
+    trap_oid_vb.value = OID.new(oid).to_ber
+
+    [uptime_vb, trap_oid_vb] + extra
+  end
+
   # Multi-varbind Set: one SetRequest assigning every OID => value pair. The Hash
   # keeps insertion order, so the varbinds go out in the order they were given.
   def set(values : Hash(String, _), request_id = rand(2147483647))
