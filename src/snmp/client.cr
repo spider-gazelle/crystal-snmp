@@ -12,16 +12,20 @@ class SNMP::Client
   getter port : Int32
 
   def initialize(@host : String, community = "public", @timeout = 3, @port = 161)
-    @socket = UDPSocket.new
-    socket.sync = false
-    socket.read_timeout = timeout
+    @socket = build_socket
     @session = SNMP::Session.new(community: community)
   end
 
   def initialize(@host : String, @session : SNMP::Session | SNMP::V3::Session, @timeout = 3, @port = 161)
-    @socket = UDPSocket.new
+    @socket = build_socket
+  end
+
+  # A fresh, buffered UDP socket with the configured read timeout.
+  private def build_socket : UDPSocket
+    socket = UDPSocket.new
     socket.sync = false
     socket.read_timeout = timeout
+    socket
   end
 
   # True when *oid* is the *base* subtree or a descendant of it. Compares OID
@@ -32,11 +36,7 @@ class SNMP::Client
   end
 
   private def with_socket(&)
-    if socket.closed?
-      @socket = UDPSocket.new
-      socket.sync = false
-      socket.read_timeout = timeout
-    end
+    @socket = build_socket if socket.closed?
     socket.connect(host, port)
     begin
       yield socket
