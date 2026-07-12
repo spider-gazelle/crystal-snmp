@@ -221,14 +221,22 @@ class SNMP::V3::Security
 
   def passkey(password)
     @digest.reset
-    password_index = 0
 
-    password_length = password.size
-    while password_index < 1048576
-      initial = password_index % password_length
-      rotated = password[initial..-1] + password[0, initial]
-      buffer = rotated * (64 // rotated.size) + rotated[0, 64 % rotated.size]
-      password_index += 64
+    # RFC 3414 A.2 expands the password (a sequence of octets) to 2^20 bytes by
+    # cycling through it, then hashes the stream. Feed it in a single reused
+    # 64-byte chunk indexed cyclically, instead of allocating two Strings per
+    # iteration (the old rotated/buffer concats) × 16384 iterations.
+    bytes = password.to_slice
+    length = bytes.size
+    buffer = Bytes.new(64)
+    offset = 0
+
+    (1048576 // 64).times do
+      64.times do |i|
+        buffer[i] = bytes[offset]
+        offset += 1
+        offset = 0 if offset == length
+      end
       @digest << buffer
     end
 
