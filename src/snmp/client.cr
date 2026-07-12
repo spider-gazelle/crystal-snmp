@@ -166,6 +166,45 @@ class SNMP::Client
     request(sock) { session.set(values) }
   end
 
+  # Send an SNMPv2-Trap to the configured host/port (typically a trap sink on
+  # 162). Fire-and-forget: a trap is unacknowledged, so nothing is read back.
+  def send_trap_v2(oid : String, uptime = 0, varbinds : Array(SNMP::VarBind) = [] of SNMP::VarBind) : Nil
+    emit community_session.trap_v2(oid, uptime, varbinds)
+  end
+
+  # Send an SNMPv1 Trap (RFC 1157). Fire-and-forget.
+  def send_trap_v1(enterprise : String, agent_address : String, generic_trap : SNMP::GenericTrap, specific_trap = 0, uptime = 0, varbinds : Array(SNMP::VarBind) = [] of SNMP::VarBind) : Nil
+    emit community_session.trap_v1(enterprise, agent_address, generic_trap, specific_trap, uptime, varbinds)
+  end
+
+  # Send an Inform and return the receiver's acknowledging Response.
+  def send_inform(oid : String, uptime = 0, varbinds : Array(SNMP::VarBind) = [] of SNMP::VarBind) : SNMP::Message
+    message = community_session.inform(oid, uptime, varbinds)
+    response : SNMP::Message? = nil
+    with_socket do |sock|
+      sock.write_bytes message
+      sock.flush
+      response = session.parse(sock.read_bytes(ASN1::BER))
+    end
+    raise Error.new("no response to inform from #{host}:#{port}") if response.nil?
+    response
+  end
+
+  # Notifications use the community (v1/v2c) session; v3 notification sending is
+  # not implemented yet.
+  private def community_session : SNMP::Session
+    sess = session
+    raise Error.new("notification sending requires a v1/v2c (community) session") unless sess.is_a?(SNMP::Session)
+    sess
+  end
+
+  private def emit(message : SNMP::Message) : Nil
+    with_socket do |sock|
+      sock.write_bytes message
+      sock.flush
+    end
+  end
+
   def walk(oid : String) : Array(SNMP::Message)
     messages = [] of SNMP::Message
     with_socket do |sock|
