@@ -2,101 +2,190 @@
 
 [![CI](https://github.com/spider-gazelle/crystal-snmp/actions/workflows/ci.yml/badge.svg)](https://github.com/spider-gazelle/crystal-snmp/actions/workflows/ci.yml)
 
-NOTE:: I consider the project ready to use. Usage won't change significantly between now and v1.0.0
+An SNMP library for Crystal — v1, v2c and v3, usable on both the manager and
+agent side.
+
+* SNMPv3 USM with MD5 / SHA-1 / SHA-2 authentication (RFC 7860) and
+  DES / AES-128/192/256 privacy, engine discovery, RFC 3414 time-window
+  enforcement and automatic resync on `usmStats` Reports
+* Get / GetNext / GetBulk / Set, single or multi-varbind, subtree walks
+* Typed SET values (`Counter32`, `Gauge32`, `TimeTicks`, `Counter64`,
+  `IpAddress`, `Opaque`, `OID`)
+* Trap / Inform building, sending and parsing (v1, v2c)
+* A typed exception hierarchy rooted at `SNMP::Error`
+
+## Installation
+
+Add the shard to your `shard.yml`:
+
+```yaml
+dependencies:
+  snmp:
+    github: spider-gazelle/crystal-snmp
+```
 
 ## Usage
 
-This library can be used to build either an SNMP Agent or Client application.
-The examples below indicate how to use it as a client.
+The code blocks below are kept in [`examples/`](examples/) and type-checked by
+the CI, so they stay in sync with the library.
 
-### SNMP v2c
+### High-level client
+
+`SNMP::Client` drives the socket for you (reused across requests) — one client
+per fiber. From [`examples/client.cr`](examples/client.cr):
 
 ```crystal
-# Connect to server
-socket = UDPSocket.new
-socket.connect("demo.snmplabs.com", 161)
-socket.sync = false
+require "snmp"
 
-# Make request
-session = SNMP::Session.new
-socket.write_bytes session.get("1.3.6.1.2.1.1.4.0")
-socket.flush
+# ---- v2c ----
+client = SNMP::Client.new("localhost", community: "public")
 
-# Process response
-response = session.parse(socket.read_bytes(ASN1::BER))
-response.value.get_string # "SNMP Laboratories, info@snmplabs.com"
+# Single get: the shortcut accessors read the first varbind
+message = client.get("1.3.6.1.2.1.1.4.0")
+puts message.value.get_string
+
+# Multi-varbind get: one round-trip for several OIDs
+message = client.get(["1.3.6.1.2.1.1.1.0", "1.3.6.1.2.1.1.5.0"])
+message.varbinds.each { |varbind| puts "#{varbind.oid} => #{varbind.value.get_string}" }
+
+# Walk a subtree (GetNext based); the block form streams
+client.walk("1.3.6.1.2.1.1.9.1.3") do |msg|
+  puts "#{msg.oid} => #{msg.value.get_string}"
+end
+
+# Bulk walk (GetBulk based, fewer round-trips); yields each VarBind
+client.bulk_walk("1.3.6.1.2.1.2.2.1.2", max_repetitions: 25) do |varbind|
+  puts "#{varbind.oid} => #{varbind.value.get_string}"
+end
+
+# Set values — Crystal primitives or typed SNMP values
+client.set("1.3.6.1.2.1.1.6.0", "server room")
+client.set("1.3.6.1.2.1.1.3.0", SNMP::TimeTicks.new(12_345_u32))
+
+# Multi-varbind set: one SetRequest for several assignments
+client.set({
+  "1.3.6.1.2.1.1.5.0" => "hostname",
+  "1.3.6.1.2.1.1.6.0" => "the location",
+})
+
+# Send notifications (community sessions)
+client.send_trap_v2("1.3.6.1.4.1.8072.2.3.0.1", uptime: 12_345)
+response = client.send_inform("1.3.6.1.4.1.8072.2.3.0.1")
+puts response.request # Response (the inform acknowledgement)
+
+# Release the reused UDP socket when done (reconnects transparently if reused)
+client.close
+
+# ---- v3 ----
+# The client drives engine discovery, HMAC verification, the RFC 3414 time
+# window, and auto-resyncs/retries once on a usmStats Report.
+security = SNMP::V3::Security.new(
+  "usr-sha-aes",
+  auth_protocol: SNMP::V3::Security::AuthProtocol::SHA256,
+  auth_password: "authkey1",
+  priv_protocol: SNMP::V3::Security::PrivacyProtocol::AES256,
+  priv_password: "privkey1"
+)
+v3_client = SNMP::Client.new("localhost", SNMP::V3::Session.new(security))
+puts v3_client.get("1.3.6.1.2.1.1.4.0").value.get_string
 ```
 
-### SNMP v3
+### Raw sockets
+
+When you manage the transport yourself, always check that the response answers
+*your* request (response-id) before trusting the values.
+
+SNMPv2c, from [`examples/v2c_raw.cr`](examples/v2c_raw.cr):
 
 ```crystal
-# Connect to server
+require "snmp"
+
+# Connect to the agent
 socket = UDPSocket.new
-socket.connect("demo.snmplabs.com", 161)
+socket.connect("localhost", 161)
 socket.sync = false
+socket.read_timeout = 3.seconds
 
-# Setup session
-session = SNMP::V3::Session.new("usr-md5-aes", "authkey1", "privkey1", priv_protocol: SNMP::V3::Security::PrivacyProtocol::AES)
+# Build and send the request
+session = SNMP::Session.new(community: "public")
+request = session.get("1.3.6.1.2.1.1.4.0")
+socket.write_bytes request
+socket.flush
 
-# This is required to get the engine ID, boot and tick times
-# You can read about it here: https://www.snmpsharpnet.com/?page_id=28
+# Parse the response, verifying it answers *this* request
+response = session.parse(socket.read_bytes(ASN1::BER))
+raise "response-id mismatch" unless response.request_id == request.request_id
+raise "agent error: #{response.error_status}" unless response.error_status.no_error?
+
+puts response.value.get_string
+socket.close
+```
+
+SNMPv3, from [`examples/v3_raw.cr`](examples/v3_raw.cr):
+
+```crystal
+require "snmp"
+
+# Connect to the agent
+socket = UDPSocket.new
+socket.connect("localhost", 161)
+socket.sync = false
+socket.read_timeout = 3.seconds
+
+# Session with authentication and privacy (see AuthProtocol / PrivacyProtocol
+# for the supported algorithms, incl. SHA-2 and AES-256)
+session = SNMP::V3::Session.new(
+  "usr-md5-aes", "authkey1", "privkey1",
+  priv_protocol: SNMP::V3::Security::PrivacyProtocol::AES
+)
+
+# Discover the engine id / boots / time (required before authenticated requests;
+# also drives periodic revalidation of the RFC 3414 time window)
 if session.must_revalidate?
   socket.write_bytes session.engine_validation_probe
   socket.flush
   session.validate socket.read_bytes(ASN1::BER)
 end
 
-# Make the request
-# NOTE:: with SNMPv3 you need to prepare the message for transmission
-unencrypted_message = session.get("1.3.6.1.2.1.1.4.0")
-socket.write_bytes session.prepare(unencrypted_message)
+# Build the request, then prepare it (encrypt + sign) for transmission
+request = session.get("1.3.6.1.2.1.1.4.0")
+socket.write_bytes session.prepare(request)
 socket.flush
 
-# Process response
+# Parse the response: the HMAC is verified and the time window enforced.
+# Still check that it answers *this* request before trusting the values.
 response = session.parse(socket.read_bytes(ASN1::BER))
-response.value.get_string # "SNMP Laboratories, info@snmplabs.com"
+raise "response-id mismatch" unless response.request_id == request.request_id
+raise "agent error: #{response.error_status}" unless response.error_status.no_error?
+
+puts response.value.get_string
+socket.close
 ```
 
 ### Setting values
 
-NOTE:: `set` currently supports:
-
-* Strings
-* Integers
-* Boolean
-* Nil
-
-More crystal classes will be added over time (such as `Float` and `Socket::IPAddress` etc)
+`set` accepts Crystal primitives (`String`, `Int`, `Bool`, `Nil`), the typed
+SNMP values (`SNMP::Counter32`, `Gauge32`, `TimeTicks`, `Counter64`,
+`IpAddress`, `Opaque`, `OID` — encoded with their proper application tags), a
+pre-built `SNMP::VarBind`, or a raw `ASN1::BER` for anything exotic:
 
 ```crystal
-# Setting a string
-session.set("1.3.6.1.2.1.1.3.0", "some string value")
+session.set("1.3.6.1.2.1.1.6.0", "some string value")
+session.set("1.3.6.1.2.1.1.3.0", SNMP::TimeTicks.new(34_u32))
 
-# Setting an integer
-session.set("1.3.6.1.2.1.1.3.0", 34)
-```
-
-For more complex or currently unsupported types you can build a custom ASN1.BER.
-
-```crystal
+# Escape hatch for unsupported encodings
 ber = ASN1::BER.new
 ber.tag_class = ASN1::BER::TagClass::Application
 ber.tag_number = 12
-ber.payload = Bytes[1,2,3,4,5]
-
+ber.payload = Bytes[1, 2, 3, 4, 5]
 session.set("1.3.6.1.2.1.1.3.0", ber)
 ```
 
 ### Extracting response values
 
-The response value is always an `ASN1::BER`
-
-```crystal
-response = session.parse(socket.read_bytes(ASN1::BER))
-response.value
-```
-
-You can extract common data types using helper methods:
+The response value is always an `ASN1::BER` (`message.value` — use
+`message.varbind` for the whole OID/value pair, or `message.varbinds` for all
+of them). Helper methods extract the common types:
 
 * `.get_string`
 * `.get_object_id` for SNMP OIDs such as 1.3.6.1.2.1
@@ -105,34 +194,51 @@ You can extract common data types using helper methods:
 * `.get_boolean`
 * `.get_integer` returning an `Int64`
 
+`SNMP.get_unsigned32` / `SNMP.get_unsigned64` decode Counter/Gauge values, and
+`VarBind#no_such_object?` / `#no_such_instance?` / `#end_of_mib_view?` detect
+the SNMPv2 exception values.
+
+### Errors
+
+Everything the library raises inherits `SNMP::Error`: `SNMP::ParseError`
+(malformed wire data), `SNMP::VersionError`, `SNMP::TimeoutError`, and
+`SNMP::V3::Security::Error` with `AuthenticationError` /
+`NotInTimeWindowError` / `ReportError` for the v3 security machinery.
 
 ## Notes on IO
 
-### Writing to Sockets
+### Writing to sockets
 
-When writing SNMP messages to the socket, be aware that you should be buffering the write.
+When writing SNMP messages to a socket yourself, buffer the write:
 
 ```crystal
-
-session = SNMP::V3::Session.new
-message = session.engine_validation_probe
-
-# Ensure sync is false so the message is buffered
-socket.sync = false
-socket.write_bytes message
-
-# This requires you to call `flush`
-socket.flush
-
+socket.sync = false          # buffer…
+socket.write_bytes message   # …the message construction writes…
+socket.flush                 # …and send one datagram
 ```
 
-This is because the call to `to_io` on message involves multiple writes to the IO
-as the message is progressively constructed. However you don't want each write to
-be sending packets as this will result in a lot of overhead and most SNMP servers
-will not accept fragmented messages.
-
+`to_io` writes the message progressively; without buffering each write would
+be sent as its own packet and most SNMP agents will not accept fragmented
+messages. (`SNMP::Client` handles this for you.)
 
 ### Reading from sockets
 
 Whilst you'll probably be OK reading data like `socket.read_bytes(ASN1::BER)`
-you should probably be buffering requests based on SNMP PDU Max Size (defaulting to 65507 bytes) and throwing away any buffered data that can't be read after buffering or a short timeout.
+you should probably be buffering requests based on SNMP PDU max size
+(defaulting to 65507 bytes) and throwing away any buffered data that can't be
+read after buffering or a short timeout.
+
+## Development
+
+The toolchain is pinned with [mise](https://mise.jdx.dev): `mise install`, then
+`mise dev:deps`. The main tasks:
+
+| Task | What it does |
+|------|--------------|
+| `dev:spec` | deterministic spec suite (offline) |
+| `dev:snmpd` + `dev:spec-e2e` | live suite against a local net-snmp agent |
+| `dev:check` | format-check + lint + spec + multi-threaded spec |
+| `dev:examples` | type-check the README examples |
+
+See [`CLAUDE.md`](CLAUDE.md) for the full task list and spec-tagging
+conventions.
