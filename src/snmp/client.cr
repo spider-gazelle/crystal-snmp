@@ -87,25 +87,13 @@ class SNMP::Client
   end
 
   def get(oid : String) : SNMP::Message
-    msg : SNMP::Message? = nil
-    with_socket do |sock|
-      msg = get(oid, sock)
-    end
-
-    raise Error.new("Failed to read message") if msg.nil?
-    msg
+    with_socket { |sock| get(oid, sock) }
   end
 
   # Multi-varbind Get: one round-trip binding every OID; the Response carries a
   # varbind per requested OID.
   def get(oids : Enumerable(String)) : SNMP::Message
-    msg : SNMP::Message? = nil
-    with_socket do |sock|
-      msg = get(oids, sock)
-    end
-
-    raise Error.new("Failed to read message") if msg.nil?
-    msg
+    with_socket { |sock| get(oids, sock) }
   end
 
   private def get(oid : String, sock : UDPSocket) : SNMP::Message
@@ -117,26 +105,12 @@ class SNMP::Client
   end
 
   def get_next(oid : String) : SNMP::Message
-    msg : SNMP::Message? = nil
-
-    with_socket do |sock|
-      msg = get_next(oid, sock)
-    end
-
-    raise Error.new("Failed to read message") if msg.nil?
-    msg
+    with_socket { |sock| get_next(oid, sock) }
   end
 
   # Multi-varbind GetNext: advances every supplied OID in one round-trip.
   def get_next(oids : Enumerable(String)) : SNMP::Message
-    msg : SNMP::Message? = nil
-
-    with_socket do |sock|
-      msg = get_next(oids, sock)
-    end
-
-    raise Error.new("Failed to read message") if msg.nil?
-    msg
+    with_socket { |sock| get_next(oids, sock) }
   end
 
   private def get_next(oid : String, sock : UDPSocket) : SNMP::Message
@@ -150,13 +124,7 @@ class SNMP::Client
   # GetBulk: one round-trip returning up to *max_repetitions* successors per
   # repeating OID. Returns the raw Response message (its PDU holds every varbind).
   def get_bulk(oids : Enumerable(String), non_repeaters = 0, max_repetitions = 10) : SNMP::Message
-    msg : SNMP::Message? = nil
-    with_socket do |sock|
-      msg = get_bulk(oids, sock, non_repeaters, max_repetitions)
-    end
-
-    raise Error.new("Failed to read message") if msg.nil?
-    msg
+    with_socket { |sock| get_bulk(oids, sock, non_repeaters, max_repetitions) }
   end
 
   private def get_bulk(oids : Enumerable(String), sock : UDPSocket, non_repeaters, max_repetitions) : SNMP::Message
@@ -166,24 +134,12 @@ class SNMP::Client
   # Set a single OID to *value* (a typed SNMP value, a Crystal primitive, or a
   # raw `ASN1::BER`) and return the agent's Response.
   def set(oid : String, value) : SNMP::Message
-    msg : SNMP::Message? = nil
-    with_socket do |sock|
-      msg = set(oid, value, sock)
-    end
-
-    raise Error.new("Failed to read message") if msg.nil?
-    msg
+    with_socket { |sock| set(oid, value, sock) }
   end
 
   # Multi-varbind Set: assign every OID => value pair in one round-trip.
   def set(values : Hash(String, _)) : SNMP::Message
-    msg : SNMP::Message? = nil
-    with_socket do |sock|
-      msg = set(values, sock)
-    end
-
-    raise Error.new("Failed to read message") if msg.nil?
-    msg
+    with_socket { |sock| set(values, sock) }
   end
 
   private def set(oid : String, value, sock : UDPSocket) : SNMP::Message
@@ -208,14 +164,11 @@ class SNMP::Client
   # Send an Inform and return the receiver's acknowledging Response.
   def send_inform(oid : String, uptime = 0, varbinds : Array(SNMP::VarBind) = [] of SNMP::VarBind) : SNMP::Message
     message = community_session.inform(oid, uptime, varbinds)
-    response : SNMP::Message? = nil
     with_socket do |sock|
       sock.write_bytes message
       sock.flush
-      response = session.parse(sock.read_bytes(ASN1::BER))
+      session.parse(sock.read_bytes(ASN1::BER))
     end
-    raise Error.new("no response to inform from #{host}:#{port}") if response.nil?
-    response
   end
 
   # Notifications use the community (v1/v2c) session; v3 notification sending is
