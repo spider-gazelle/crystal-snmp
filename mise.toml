@@ -26,13 +26,24 @@ description = "Run the deterministic spec suite (excludes e2e / legacy)"
 run = "crystal spec --error-trace --tag '~e2e' --tag '~legacy' {{vars.SPEC_OPTS}}"
 
 [tasks."dev:spec-e2e"]
-description = "Run the live spec suite against a real SNMP server (set TEST_SNMP_SERVER)"
+description = "Run the live spec suite against a real SNMP server (set TEST_SNMP_SERVER / TEST_SNMP_PORT)"
+# The legacy provider is activated so the SNMPv3 DES live spec can encrypt (des-cbc).
+env = { OPENSSL_CONF = "{{config_root}}/.mise/openssl-legacy.cnf" }
 run = "crystal spec --error-trace --tag e2e {{vars.SPEC_OPTS}}"
 
 [tasks."dev:spec-legacy"]
 description = "Run specs needing OpenSSL legacy algorithms (DES); activates the OpenSSL legacy provider"
 env = { OPENSSL_CONF = "{{config_root}}/.mise/openssl-legacy.cnf" }
 run = "crystal spec --error-trace --tag legacy {{vars.SPEC_OPTS}}"
+
+[tasks."dev:snmpd"]
+description = "Run the test SNMP agent on 127.0.0.1:16161 (foreground; pair with dev:spec-e2e)"
+run = """
+SNMPD=$(command -v snmpd || true)
+[ -x "$SNMPD" ] || SNMPD=/opt/homebrew/opt/net-snmp/sbin/snmpd
+[ -x "$SNMPD" ] || SNMPD=/usr/sbin/snmpd
+SNMP_PERSISTENT_DIR=$(mktemp -d) exec "$SNMPD" -C -c {{config_root}}/spec/support/snmpd.conf -Lo -f
+"""
 
 [tasks."dev:spec-mt"]
 description = "Run the deterministic spec suite multi-threaded (fiber-safety gate)"

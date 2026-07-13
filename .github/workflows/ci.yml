@@ -81,11 +81,27 @@ jobs:
       - name: Install dependencies
         run: mise dev:deps
 
+      - name: Start the test SNMP agent
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q snmpd
+          SNMP_PERSISTENT_DIR="$RUNNER_TEMP/snmpd-persist" /usr/sbin/snmpd -C -c spec/support/snmpd.conf -Lo -f &
+          sleep 1
+
       - name: Run tests
         run: mise dev:spec
 
       - name: Run tests (multi-threaded)
         run: mise dev:spec-mt
+
+      - name: Run tests (OpenSSL legacy / DES)
+        run: mise dev:spec-legacy
+
+      - name: Run tests (live agent)
+        run: mise dev:spec-e2e
+        env:
+          TEST_SNMP_SERVER: 127.0.0.1
+          TEST_SNMP_PORT: "16161"
 
   # Best-effort early warning against the Crystal nightly compiler. mise has no
   # nightly build, so this job uses the nightly container directly and is allowed
@@ -125,8 +141,23 @@ jobs:
       - name: Install dependencies
         run: mise dev:deps
 
+      - name: Start the test SNMP agent
+        run: |
+          brew install net-snmp
+          SNMP_PERSISTENT_DIR="$RUNNER_TEMP/snmpd-persist" "$(brew --prefix net-snmp)/sbin/snmpd" -C -c spec/support/snmpd.conf -Lo -f &
+          sleep 1
+
       - name: Run tests
         run: mise dev:spec
 
       - name: Run tests (multi-threaded)
         run: mise dev:spec-mt
+
+      - name: Run tests (OpenSSL legacy / DES)
+        run: mise dev:spec-legacy
+
+      - name: Run tests (live agent)
+        run: mise dev:spec-e2e
+        env:
+          TEST_SNMP_SERVER: 127.0.0.1
+          TEST_SNMP_PORT: "16161"
