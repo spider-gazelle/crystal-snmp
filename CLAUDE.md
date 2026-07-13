@@ -31,10 +31,12 @@ Run via `mise <task>`:
 | `dev:format-check` | CI formatting gate |
 | `dev:ameba` | static analysis |
 | `dev:spec` | deterministic spec suite (excludes `e2e` + `legacy`) |
-| `dev:spec-e2e` | live specs against a real server (set `TEST_SNMP_SERVER`) |
+| `dev:snmpd` | run the test SNMP agent on `127.0.0.1:16161` (foreground) |
+| `dev:spec-e2e` | live specs against a real server (set `TEST_SNMP_SERVER` / `TEST_SNMP_PORT`) |
 | `dev:spec-legacy` | specs needing OpenSSL legacy algorithms (DES) |
 | `dev:spec-mt` | deterministic suite multi-threaded (`-Dpreview_mt`, fiber-safety gate) |
 | `dev:docs` | build the API docs (fails on doc-comment / compile errors) |
+| `dev:examples` | type-check the README examples (`examples/*.cr`) |
 | `dev:check` | format-check + ameba + spec + spec-mt in one shot |
 
 On macOS, if `shards` is missing after a fresh Crystal install, run
