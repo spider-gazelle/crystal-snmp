@@ -267,12 +267,10 @@ describe SNMP do
     io.to_slice.hexstring.should eq(output)
   end
 
-  it "should be able to query SNMPLabs with MD5 auth", tags: "e2e" do
-    pending!("not sure how to configure SNMPv3 on the simulator")
-
+  it "should be able to query the live agent with MD5 auth", tags: "e2e" do
     # Connect to server
     socket = UDPSocket.new
-    socket.connect(TEST_SNMP_SERVER, 161)
+    socket.connect(TEST_SNMP_SERVER, TEST_SNMP_PORT)
     socket.sync = false
     socket.read_timeout = 3.seconds
 
@@ -294,12 +292,10 @@ describe SNMP do
     response.value.get_string.should eq("SNMP Laboratories, info@snmplabs.com")
   end
 
-  it "should be able to query SNMPLabs with MD5 and AES auth", tags: "e2e" do
-    pending!("not sure how to configure SNMPv3 on the simulator")
-
+  it "should be able to query the live agent with MD5 and AES auth", tags: "e2e" do
     # Connect to server
     socket = UDPSocket.new
-    socket.connect(TEST_SNMP_SERVER, 161)
+    socket.connect(TEST_SNMP_SERVER, TEST_SNMP_PORT)
     socket.sync = false
     socket.read_timeout = 3.seconds
 
@@ -321,12 +317,10 @@ describe SNMP do
     response.value.get_string.should eq("SNMP Laboratories, info@snmplabs.com")
   end
 
-  it "should be able to query SNMPLabs with MD5 and DES auth", tags: "e2e" do
-    pending!("not sure how to configure SNMPv3 on the simulator")
-
+  it "should be able to query the live agent with MD5 and DES auth", tags: "e2e" do
     # Connect to server
     socket = UDPSocket.new
-    socket.connect(TEST_SNMP_SERVER, 161)
+    socket.connect(TEST_SNMP_SERVER, TEST_SNMP_PORT)
     socket.sync = false
     socket.read_timeout = 3.seconds
 
@@ -348,10 +342,10 @@ describe SNMP do
     response.value.get_string.should eq("SNMP Laboratories, info@snmplabs.com")
   end
 
-  it "should be able to query SNMPLabs with SNMPv2", tags: "e2e" do
+  it "should be able to query the live agent with SNMPv2", tags: "e2e" do
     # Connect to server
     socket = UDPSocket.new
-    socket.connect(TEST_SNMP_SERVER, 161)
+    socket.connect(TEST_SNMP_SERVER, TEST_SNMP_PORT)
     socket.sync = false
     socket.read_timeout = 3.seconds
 
@@ -365,27 +359,23 @@ describe SNMP do
     response.value.get_string.should start_with("SNMP Laboratories")
   end
 
-  it "should be able to set an OID on SNMPLabs with SNMPv2", tags: "e2e" do
+  it "should surface the agent's error on a rejected SET", tags: "e2e" do
     # Connect to server
     socket = UDPSocket.new
-    # socket.connect("localhost", 32771)
-    socket.connect(TEST_SNMP_SERVER, 161)
+    socket.connect(TEST_SNMP_SERVER, TEST_SNMP_PORT)
     socket.sync = false
     socket.read_timeout = 3.seconds
 
-    # Make request
+    # SET through a read-only community: the agent must reject it
     session = SNMP::Session.new("public")
     socket.write_bytes session.set("1.3.6.1.2.1.1.3.0.0.0.0", 43)
     socket.flush
 
-    # Process response
+    # net-snmp answers noAccess(6) pointing at the first varbind — this also
+    # exercises non-zero error-status/index decoding against a live agent
     response = session.parse(socket.read_bytes(ASN1::BER))
     response.request.should eq(SNMP::Request::Response)
-
-    # Response should be: No Such Instance currently exists at this OID
-    response.pdu.error_status.should eq(SNMP::ErrorStatus::NoError)
-    response.pdu.error_index.should eq(0)
-    response.value.tag_class.should eq(ASN1::BER::TagClass::ContextSpecific)
-    response.value.tag_number.should eq(1)
+    response.pdu.error_status.should eq(SNMP::ErrorStatus::AccessDenied)
+    response.pdu.error_index.should eq(1)
   end
 end

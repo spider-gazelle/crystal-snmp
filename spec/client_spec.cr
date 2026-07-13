@@ -14,7 +14,7 @@ describe SNMP::Client do
   end
 
   it "should perform a walk", tags: "e2e" do
-    client = SNMP::Client.new(TEST_SNMP_SERVER)
+    client = SNMP::Client.new(TEST_SNMP_SERVER, port: TEST_SNMP_PORT)
     client.should_not be_nil
     messages = client.walk("1.3.6.1.2.1.1.9.1.3")
     messages.should be_a(Array(SNMP::Message))
@@ -22,7 +22,7 @@ describe SNMP::Client do
   end
 
   it "should perform a walk using a block", tags: "e2e" do
-    client = SNMP::Client.new(TEST_SNMP_SERVER)
+    client = SNMP::Client.new(TEST_SNMP_SERVER, port: TEST_SNMP_PORT)
     client.should_not be_nil
     messages = [] of SNMP::Message
     client.walk("1.3.6.1.2.1.1.9.1.3") do |message|
