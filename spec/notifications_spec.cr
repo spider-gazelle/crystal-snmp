@@ -45,7 +45,7 @@ describe SNMP::Session do
     parsed.version.should eq(SNMP::Version::V1)
     parsed.request.should eq(SNMP::Request::V1_Trap)
     trap = parsed.pdu.as(SNMP::V1Trap)
-    trap.oid.should eq("1.3.6.1.4.1.9")
+    trap.enterprise.should eq("1.3.6.1.4.1.9")
     trap.agent_address.should eq("10.0.0.1")
     trap.generic_trap.should eq(SNMP::GenericTrap::LinkDown)
     trap.specific_trap.should eq(0)

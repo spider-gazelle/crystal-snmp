@@ -16,7 +16,9 @@ describe SNMP do
 
     snmp_pdu = snmp.pdu
     if snmp_pdu.is_a?(SNMP::V1Trap)
-      snmp_pdu.oid.should eq("1.3.6.1.6.3.1.1.5")
+      snmp_pdu.enterprise.should eq("1.3.6.1.6.3.1.1.5")
+      # PDU#oid keeps its standard meaning: the first varbind's OID
+      snmp_pdu.oid.should eq("1.3.6.1.2.1.2.2.1.1.26")
       snmp_pdu.agent_address.should eq("10.230.254.28")
       snmp_pdu.generic_trap.should eq(SNMP::GenericTrap::LinkUp)
       snmp_pdu.specific_trap.should eq(0)

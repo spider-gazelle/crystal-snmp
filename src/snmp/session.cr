@@ -100,7 +100,7 @@ class SNMP::Session
   # enterprise OID, *agent_address* a dotted-quad IPv4 string.
   def trap_v1(enterprise, agent_address, generic_trap : GenericTrap, specific_trap = 0, uptime = 0, varbinds : Array(VarBind) = [] of VarBind, request_id = rand(REQUEST_ID_RANGE))
     pdu = V1Trap.new(agent_address, generic_trap, specific_trap.to_i32,
-      oid: enterprise, time_ticks: uptime.to_u32, varbinds: varbinds, request_id: request_id)
+      enterprise: enterprise, time_ticks: uptime.to_u32, varbinds: varbinds, request_id: request_id)
     SNMP::Message.new(@community, Request::V1_Trap, pdu, version: Version::V1)
   end
 
