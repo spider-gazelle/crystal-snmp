@@ -274,7 +274,7 @@ describe SNMP do
     socket = UDPSocket.new
     socket.connect(TEST_SNMP_SERVER, 161)
     socket.sync = false
-    socket.read_timeout = 3
+    socket.read_timeout = 3.seconds
 
     # Setup session
     session = SNMP::V3::Session.new("usr-md5-none", "authkey1")
@@ -301,7 +301,7 @@ describe SNMP do
     socket = UDPSocket.new
     socket.connect(TEST_SNMP_SERVER, 161)
     socket.sync = false
-    socket.read_timeout = 3
+    socket.read_timeout = 3.seconds
 
     # Setup session
     session = SNMP::V3::Session.new("usr-md5-aes", "authkey1", "privkey1", priv_protocol: SNMP::V3::Security::PrivacyProtocol::AES)
@@ -328,7 +328,7 @@ describe SNMP do
     socket = UDPSocket.new
     socket.connect(TEST_SNMP_SERVER, 161)
     socket.sync = false
-    socket.read_timeout = 3
+    socket.read_timeout = 3.seconds
 
     # Setup session
     session = SNMP::V3::Session.new("usr-md5-des", "authkey1", "privkey1")
@@ -353,7 +353,7 @@ describe SNMP do
     socket = UDPSocket.new
     socket.connect(TEST_SNMP_SERVER, 161)
     socket.sync = false
-    socket.read_timeout = 3
+    socket.read_timeout = 3.seconds
 
     # Make request
     session = SNMP::Session.new
@@ -371,7 +371,7 @@ describe SNMP do
     # socket.connect("localhost", 32771)
     socket.connect(TEST_SNMP_SERVER, 161)
     socket.sync = false
-    socket.read_timeout = 3
+    socket.read_timeout = 3.seconds
 
     # Make request
     session = SNMP::Session.new("public")

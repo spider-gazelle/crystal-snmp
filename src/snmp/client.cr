@@ -32,7 +32,7 @@ class SNMP::Client
   private def build_socket : UDPSocket
     socket = UDPSocket.new
     socket.sync = false
-    socket.read_timeout = timeout
+    socket.read_timeout = timeout.seconds
     socket
   end
 

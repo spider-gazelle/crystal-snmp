@@ -36,7 +36,7 @@ class SNMP::V3::Security::AES
 
   def decrypt(encrypted_data : Bytes, salt : Bytes, engine_boots, engine_time)
     # 3.3.2.1
-    raise "invalid privacy salt received" unless (salt.size % 8).zero?
+    raise SNMP::ParseError.new("invalid privacy salt received") unless (salt.size % 8).zero?
 
     cipher = OpenSSL::Cipher.new(cipher_name)
     cipher.padding = false

@@ -9,10 +9,10 @@ class SNMP::PDU
     end
   end
 
-  def initialize(@request_id = rand(2147483647), @varbinds : Array(VarBind) = [] of VarBind, @error_status = ErrorStatus::NoError, @error_index = 0)
+  def initialize(@request_id = rand(REQUEST_ID_RANGE), @varbinds : Array(VarBind) = [] of VarBind, @error_status = ErrorStatus::NoError, @error_index = 0)
   end
 
-  def initialize(@request_id = rand(2147483647), varbind : VarBind? = nil, @error_status = ErrorStatus::NoError, @error_index = 0)
+  def initialize(@request_id = rand(REQUEST_ID_RANGE), varbind : VarBind? = nil, @error_status = ErrorStatus::NoError, @error_index = 0)
     if varbind
       @varbinds = [varbind]
     else
@@ -31,7 +31,7 @@ class SNMP::PDU
   property max_repetitions : Int32 = 0
 
   def new_request_id
-    @request_id = rand(2147483647)
+    @request_id = rand(REQUEST_ID_RANGE)
   end
 
   # shortcut for `.varbinds[0].oid`

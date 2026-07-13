@@ -3,6 +3,9 @@ require "bindata/asn1"
 class SNMP
   alias UniversalTags = ASN1::BER::UniversalTags
 
+  # Range for a randomly-generated PDU request-id / v3 message-id.
+  REQUEST_ID_RANGE = 1..Int32::MAX
+
   module V3
     # SNMPv3 message flags describing the features used
     @[Flags]
