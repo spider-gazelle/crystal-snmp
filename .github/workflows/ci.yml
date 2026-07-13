@@ -67,6 +67,9 @@ jobs:
       - name: Build API docs
         run: mise dev:docs
 
+      - name: Type-check the README examples
+        run: mise dev:examples
+
   test_linux:
     runs-on: ubuntu-latest
     steps:
