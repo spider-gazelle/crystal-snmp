@@ -18,4 +18,26 @@ describe SNMP do
       SNMP.get_unsigned32(ber).should eq(UInt32::MAX)
     end
   end
+
+  describe ".set_unsigned64" do
+    it "pads to 8 bytes by default and round-trips" do
+      ber = SNMP.set_unsigned64(0x0102_u64)
+      ber.payload.size.should eq(8)
+      SNMP.get_unsigned64(ber).should eq(0x0102_u64)
+    end
+
+    it "strips leading zero bytes with padding: false" do
+      ber = SNMP.set_unsigned64(0x0102_u64, padding: false)
+      ber.payload.should eq(Bytes[0x01, 0x02])
+      SNMP.get_unsigned64(ber).should eq(0x0102_u64)
+    end
+  end
+
+  describe ".set_unsigned32" do
+    it "strips leading zero bytes with padding: false" do
+      ber = SNMP.set_unsigned32(0x7F_u32, padding: false)
+      ber.payload.should eq(Bytes[0x7F])
+      SNMP.get_unsigned32(ber).should eq(0x7F_u32)
+    end
+  end
 end
