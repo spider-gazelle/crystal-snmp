@@ -1,5 +1,5 @@
 name: snmp
-version: 0.9.8
+version: 1.0.0
 crystal: ">= 1.2.0"
 
 dependencies:
