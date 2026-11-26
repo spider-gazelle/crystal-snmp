@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-26
+
+### Changed
+- Require bindata 3.0.0 or newer.
+- Run CI on Crystal latest and nightly on Ubuntu and macOS.
+
+### Removed
+- Remove the obsolete Crystal version declaration from `shard.yml`.
+
+### Fixed
+- Enforce the session's authentication, privacy, and USM identity on SNMPv3
+  responses. Require authentication on time-window Reports.
+- Match replies to requests and refresh localized SNMPv3 keys when the engine
+  ID changes.
+- Send and receive complete UDP datagrams, including messages larger than
+  Crystal's stream buffer.
+- Decode GetBulk counts correctly and stop walks when OIDs stop increasing.
+- Encode string SET values as OCTET STRINGs and unsigned SNMP values as
+  minimal BER integers.
+- Raise `SNMP::ParseError` for truncated varbinds.
+- Emit unpadded AES-CFB ciphertext.
+
+## [1.0.0] - 2026-07-14
+
 ### Added
 - usmHMAC-SHA-2 authentication — `SHA224`, `SHA256`, `SHA384`, `SHA512` (RFC 7860).
 - AES-192 and AES-256 privacy, with the Blumenthal localized-key extension for
@@ -39,3 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SNMPv3 read timeouts surface as `SNMP::TimeoutError`.
 - `Message.from_io` is repaired; `V3::Message.new` takes a proper `ASN1::BER` argument.
 - `crystal tool format --check` and `bin/ameba` pass on current toolchains.
+
+[Unreleased]: https://github.com/spider-gazelle/crystal-snmp/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/spider-gazelle/crystal-snmp/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/spider-gazelle/crystal-snmp/releases/tag/v1.0.0
