@@ -18,38 +18,27 @@ class SNMP::V3::Message < SNMP::Message
     # This is the maximum segment size that the sender can accept from another SNMP engine
     @max_size = headers[1].get_integer.to_i
     flag_bytes = headers[2].get_bytes
-    @flags = MessageFlags.new(flag_bytes.empty? ? 0 : flag_bytes[0].to_i)
+    raise SNMP::ParseError.new("SNMPv3 message flags must contain one octet") unless flag_bytes.size == 1
+    @flags = MessageFlags.new(flag_bytes[0].to_i)
+    if @flags.privacy? && !@flags.authentication?
+      raise Security::AuthenticationError.new("SNMPv3 privacy requires authentication")
+    end
     @security_model = SecurityModel.new(headers[3].get_integer.to_i)
 
     # Extract security params
     @security_params = SecurityParams.new(snmp[2])
 
-    # This data is encrypted if response is an OctetString
-    if security
-      @scoped_pdu = if @flags.privacy?
-                      ber = security.decode(snmp[3], @security_params.priv_param, @security_params.engine_time, @security_params.engine_boots)
-                      begin
-                        ScopedPDU.new(ber)
-                      rescue error
-                        e = Security::Error.new("PDU decryption error. Possibly incorrect security details\n#{error.message}")
-                        e.callstack = error.callstack
-                        raise e
-                      end
-                    else
-                      ScopedPDU.new(snmp[3])
-                    end
-      verify(security, snmp[3]) if security.verify_messages? && @flags.authentication?
-    elsif snmp[3].tag == UniversalTags::Sequence
-      # This will read authenticated requests even if we don't have security details
-      @scoped_pdu = ScopedPDU.new(snmp[3])
-    else
-      raise Security::Error.new("session security required to decode PDU")
-    end
+    @scoped_pdu = decode_scoped_pdu(snmp[3], security)
 
     # For compatibility with SNMPv2 Message class
     @community = @security_params.engine_id
     @request = @scoped_pdu.request
     @pdu = @scoped_pdu.pdu
+
+    if security
+      check_security(security)
+      verify(security, snmp[3]) if security.verify_messages? && @flags.authentication?
+    end
   end
 
   def initialize(@scoped_pdu : ScopedPDU, @security_params : SecurityParams, security : Security? = nil, @security_model = SecurityModel::USM, @id = rand(REQUEST_ID_RANGE))
@@ -76,6 +65,50 @@ class SNMP::V3::Message < SNMP::Message
   property security_model : SecurityModel
   property security_params : SecurityParams
   property scoped_pdu : ScopedPDU
+
+  private def decode_scoped_pdu(payload : ASN1::BER, security : Security?) : ScopedPDU
+    unless @flags.privacy?
+      unless payload.tag == UniversalTags::Sequence
+        raise SNMP::ParseError.new("SNMPv3 plaintext scoped PDU must be a sequence")
+      end
+      return ScopedPDU.new(payload)
+    end
+
+    unless security && security.security_level.privacy? && payload.tag == UniversalTags::OctetString
+      raise Security::Error.new("SNMPv3 privacy requires an encrypted scoped PDU and session privacy credentials")
+    end
+
+    ber = security.decode(payload, @security_params.priv_param, @security_params.engine_time, @security_params.engine_boots)
+    begin
+      ScopedPDU.new(ber)
+    rescue error
+      e = Security::Error.new("PDU decryption error. Possibly incorrect security details\n#{error.message}")
+      e.callstack = error.callstack
+      raise e
+    end
+  end
+
+  private def check_security(security : Security) : Nil
+    if @request.response?
+      level = @flags & (MessageFlags::Authentication | MessageFlags::Privacy)
+      unless level == security.security_level
+        raise Security::AuthenticationError.new("SNMPv3 response security level does not match the session")
+      end
+    elsif usm_stat == UsmStat::NotInTimeWindow
+      # USM sends authenticated time-window Reports even for a private request.
+      unless @flags.authentication? && security.security_level.authentication?
+        raise Security::AuthenticationError.new("SNMPv3 time-window Report requires authentication")
+      end
+    else
+      # Discovery and other diagnostic Reports may be unauthenticated.
+      return
+    end
+
+    unless @security_model == security.security_model && @security_params.username == security.username &&
+           (security.engine_id.empty? || engine_id == security.engine_id)
+      raise Security::AuthenticationError.new("SNMPv3 message security identity does not match the session")
+    end
+  end
 
   # True if this is a Report PDU (RFC 3412 6.2.6) — the agent's error report.
   def report? : Bool

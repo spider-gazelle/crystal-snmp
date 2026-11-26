@@ -64,6 +64,18 @@ describe SNMP::V3::Message do
 end
 
 describe SNMP::V3::Session do
+  it "requires an authenticated time-window Report before updating the engine clock" do
+    engine_id = "8000000001020304"
+    session = SNMP::V3::Session.new("user", "authkey1", engine_id: engine_id)
+    report = report_message("#{SNMP::V3::USM_STATS_BASE}.2.0", engine_id, 7, 42_000)
+
+    expect_raises(SNMP::V3::Security::AuthenticationError, /time-window Report requires authentication/) do
+      session.parse(report.to_ber)
+    end
+    session.engine_boots.should eq(0)
+    session.engine_time.should eq(0)
+  end
+
   it "resyncs engine id / boots / time from a Report" do
     session = SNMP::V3::Session.new("user")
     session.resync_from(report_message("1.3.6.1.6.3.15.1.1.4.0", engine_id: "800000abcd", boots: 9, time: 12_345))
