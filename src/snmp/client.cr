@@ -5,6 +5,9 @@ class SNMP::Client
   class Error < SNMP::Error
   end
 
+  private MAX_DATAGRAM_SIZE = 65_507
+  @receive_buffer : Bytes?
+
   getter socket : UDPSocket
   getter session : SNMP::Session | SNMP::V3::Session
   getter host : String
@@ -51,9 +54,7 @@ class SNMP::Client
       reset_socket
       raise SNMP::TimeoutError.new("no response from #{host}:#{port} within #{timeout}s", cause: ex)
     rescue ex : BinData::ParseError
-      # A read timeout surfaces here as a BinData::ParseError wrapping IO::TimeoutError
       reset_socket
-      raise SNMP::TimeoutError.new("no response from #{host}:#{port} within #{timeout}s", cause: ex) if timed_out?(ex)
       raise SNMP::ParseError.new("failed to decode SNMP response from #{host}:#{port}: #{ex.message}", cause: ex)
     end
   end
@@ -75,15 +76,6 @@ class SNMP::Client
   private def reset_socket : Nil
     socket.close unless socket.closed?
     @connected = false
-  end
-
-  private def timed_out?(error : Exception) : Bool
-    cause = error.cause
-    while cause
-      return true if cause.is_a?(IO::TimeoutError)
-      cause = cause.cause
-    end
-    false
   end
 
   def get(oid : String) : SNMP::Message
@@ -164,11 +156,7 @@ class SNMP::Client
   # Send an Inform and return the receiver's acknowledging Response.
   def send_inform(oid : String, uptime = 0, varbinds : Array(SNMP::VarBind) = [] of SNMP::VarBind) : SNMP::Message
     message = community_session.inform(oid, uptime, varbinds)
-    with_socket do |sock|
-      sock.write_bytes message
-      sock.flush
-      session.parse(sock.read_bytes(ASN1::BER))
-    end
+    with_socket { |sock| transceive(sock, message) }
   end
 
   # Notifications use the community (v1/v2c) session; v3 notification sending is
@@ -180,10 +168,7 @@ class SNMP::Client
   end
 
   private def emit(message : SNMP::Message) : Nil
-    with_socket do |sock|
-      sock.write_bytes message
-      sock.flush
-    end
+    with_socket(&.send(message.to_ber.to_slice))
   end
 
   # Collect a subtree into an array. NOTE: this buffers every message in memory;
@@ -196,15 +181,16 @@ class SNMP::Client
 
   def walk(oid : String, &)
     with_socket do |sock|
-      msg = get_next(oid, sock)
+      current = oid
+      loop do
+        msg = get_next(current, sock)
+        varbind = msg.varbinds.first?
+        break unless varbind && self.class.oid_within?(varbind.oid, oid)
+        break if varbind.end_of_mib_view?
 
-      # While the message is not nil and the returned oid is a child of the request
-      while !msg.nil? && self.class.oid_within?(msg.oid, oid)
-        # Stop at the RFC 3416 endOfMibView exception (not merely an empty value).
-        break if msg.varbind.end_of_mib_view?
-
+        check_walk_progress(current, varbind.oid)
+        current = varbind.oid
         yield msg
-        msg = get_next(msg.oid, sock)
       end
     end
     self
@@ -221,18 +207,14 @@ class SNMP::Client
         # No varbinds at all: nothing more to fetch (defensive against a stuck agent).
         break if varbinds.empty?
 
-        advanced = false
         varbinds.each do |varbind|
           # End of the MIB, or the subtree is exhausted (GetBulk overshoots it).
           return self if varbind.end_of_mib_view? || !self.class.oid_within?(varbind.oid, oid)
 
-          yield varbind
+          check_walk_progress(current, varbind.oid)
           current = varbind.oid
-          advanced = true
+          yield varbind
         end
-
-        # A full response with no in-subtree progress would loop forever.
-        break unless advanced
       end
     end
     self
@@ -245,11 +227,18 @@ class SNMP::Client
     results
   end
 
+  private def check_walk_progress(previous : String, current : String) : Nil
+    previous_arcs = previous.split('.').map { |arc| BigInt.new(arc) }
+    current_arcs = current.split('.').map { |arc| BigInt.new(arc) }
+    if current_arcs <= previous_arcs
+      raise Error.new("agent returned non-increasing OID #{current} after #{previous}")
+    end
+  end
+
   protected def check_validation_probe(sock)
     if session.must_revalidate?
-      sock.write_bytes session.engine_validation_probe
-      sock.flush
-      session.validate sock.read_bytes(ASN1::BER)
+      sock.send(session.engine_validation_probe.to_ber.to_slice)
+      session.validate read_datagram(sock)
     end
   end
 
@@ -281,9 +270,21 @@ class SNMP::Client
   end
 
   private def transceive(sock, message : SNMP::Message) : SNMP::Message
-    payload = message.is_a?(SNMP::V3::Message) ? session.prepare(message) : message
-    sock.write_bytes payload
-    sock.flush
-    session.parse(sock.read_bytes(ASN1::BER))
+    payload = message.is_a?(SNMP::V3::Message) ? session.prepare(message) : message.to_ber
+    sock.send(payload.to_slice)
+    session.parse(read_datagram(sock))
+  end
+
+  private def read_datagram(sock : UDPSocket) : ASN1::BER
+    buffer = @receive_buffer ||= Bytes.new(MAX_DATAGRAM_SIZE)
+    size, _ = sock.receive(buffer)
+    io = IO::Memory.new(buffer[0, size], false)
+    ber = ASN1::BER.new
+    ber.max_content_length = size
+    ber.read(io)
+    raise SNMP::ParseError.new("unexpected trailing bytes in SNMP response") unless io.pos == io.size
+    ber
+  rescue ex : ASN1::Error | IO::EOFError
+    raise SNMP::ParseError.new("failed to decode SNMP response from #{host}:#{port}: #{ex.message}", cause: ex)
   end
 end

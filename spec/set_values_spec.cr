@@ -5,25 +5,29 @@ describe "SNMP SET value types" do
     ber = SNMP::Counter32.new(0xFFFF_0001_u32).to_ber
     ber.tag_class.should eq(ASN1::BER::TagClass::Application)
     ber.tag_number.should eq(SNMP::AppTags::Counter32.to_i)
+    ber.payload.should eq(Bytes[0x00, 0xFF, 0xFF, 0x00, 0x01])
     SNMP.get_unsigned32(ber).should eq(0xFFFF_0001_u32)
   end
 
   it "encodes Gauge32 as Application 2" do
     ber = SNMP::Gauge32.new(42_u32).to_ber
     ber.tag_number.should eq(SNMP::AppTags::Gauge32.to_i)
+    ber.payload.should eq(Bytes[42])
     SNMP.get_unsigned32(ber).should eq(42_u32)
   end
 
   it "encodes TimeTicks as Application 3" do
-    ber = SNMP::TimeTicks.new(100_u32).to_ber
+    ber = SNMP::TimeTicks.new(0_u32).to_ber
     ber.tag_number.should eq(SNMP::AppTags::TimeTicks.to_i)
-    SNMP.get_unsigned32(ber).should eq(100_u32)
+    ber.payload.should eq(Bytes[0])
+    SNMP.get_unsigned32(ber).should eq(0_u32)
   end
 
   it "encodes Counter64 as Application 6" do
     ber = SNMP::Counter64.new(0xFFFF_FFFF_FFFF_0001_u64).to_ber
     ber.tag_class.should eq(ASN1::BER::TagClass::Application)
     ber.tag_number.should eq(SNMP::AppTags::Counter64.to_i)
+    ber.payload.should eq(Bytes[0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x01])
     SNMP.get_unsigned64(ber).should eq(0xFFFF_FFFF_FFFF_0001_u64)
   end
 

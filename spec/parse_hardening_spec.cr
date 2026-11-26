@@ -33,6 +33,11 @@ describe "SNMP parse hardening" do
     expect_raises(SNMP::ParseError) { SNMP::PDU.new(pdu) }
   end
 
+  it "raises ParseError when a varbind lacks its value" do
+    varbind = sequence({ASN1::BER.new.set_object_id("1.3.6.1.2.1.1.1.0")})
+    expect_raises(SNMP::ParseError, /truncated varbind/) { SNMP::VarBind.new(varbind) }
+  end
+
   it "raises ParseError on an unknown PDU request tag" do
     # context tag 20 is not a valid Request
     pdu = ASN1::BER.new

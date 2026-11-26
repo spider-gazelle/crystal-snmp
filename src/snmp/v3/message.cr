@@ -84,7 +84,7 @@ class SNMP::V3::Message < SNMP::Message
 
   # The usmStats counter this Report names, or nil if it is not a usmStats Report.
   def usm_stat : UsmStat?
-    return nil unless report?
+    return unless report?
     oid = @pdu.varbinds.first?.try(&.oid)
     oid ? UsmStat.from_oid?(oid) : nil
   end

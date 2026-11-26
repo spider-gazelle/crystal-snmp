@@ -12,12 +12,12 @@ wire format actually requires, and spec the edge cases.
 
 ## Toolchain
 
-The toolchain is pinned with [mise](https://mise.jdx.dev) — Crystal `1.20.2`
+The toolchain is pinned with [mise](https://mise.jdx.dev) — Crystal `1.22.3`
 (see `mise.toml`). Install it and the dependencies with:
 
 ```
 mise install      # provisions the pinned Crystal
-mise dev:deps     # shards install (also builds bin/ameba)
+mise dev:deps     # shards install
 ```
 
 ## Common tasks
@@ -26,7 +26,7 @@ Run via `mise <task>`:
 
 | Task | What it does |
 |------|--------------|
-| `dev:deps` | `shards install` (also builds `bin/ameba`) |
+| `dev:deps` | `shards install` |
 | `dev:format` | format `src/` and `spec/` |
 | `dev:format-check` | CI formatting gate |
 | `dev:ameba` | static analysis |
@@ -34,7 +34,7 @@ Run via `mise <task>`:
 | `dev:snmpd` | run the test SNMP agent on `127.0.0.1:16161` (foreground) |
 | `dev:spec-e2e` | live specs against a real server (set `TEST_SNMP_SERVER` / `TEST_SNMP_PORT`) |
 | `dev:spec-legacy` | specs needing OpenSSL legacy algorithms (DES) |
-| `dev:spec-mt` | deterministic suite multi-threaded (`-Dpreview_mt`, fiber-safety gate) |
+| `dev:spec-mt` | deterministic suite with four execution-context workers |
 | `dev:docs` | build the API docs (fails on doc-comment / compile errors) |
 | `dev:examples` | type-check the README examples (`examples/*.cr`) |
 | `dev:check` | format-check + ameba + spec + spec-mt in one shot |

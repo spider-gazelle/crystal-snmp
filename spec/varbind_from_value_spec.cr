@@ -7,6 +7,7 @@ describe SNMP::VarBind do
     it "encodes a String as an OctetString" do
       vb = SNMP::VarBind.from_value(oid, "sysname")
       vb.oid.should eq(oid)
+      vb.value.tag.should eq(SNMP::UniversalTags::OctetString)
       vb.value.get_string.should eq("sysname")
     end
 

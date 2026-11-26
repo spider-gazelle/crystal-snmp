@@ -1,12 +1,12 @@
 [tools]
-crystal = "1.20.2"
+crystal = "1.22.3"
 
 [vars]
 # Add --verbose only in an interactive terminal (TTY check)
 SPEC_OPTS = "{% if exec(command='(tty -s && echo true) || echo false') == 'true' %}--verbose{% endif %}"
 
 [tasks."dev:deps"]
-description = "Install dependencies (also builds bin/ameba)"
+description = "Install dependencies"
 run = "shards install"
 
 [tasks."dev:format"]
@@ -19,7 +19,7 @@ run = "crystal tool format --check"
 
 [tasks."dev:ameba"]
 description = "Run static code analysis"
-run = "bin/ameba"
+run = "crystal run lib/ameba/src/cli.cr"
 
 [tasks."dev:spec"]
 description = "Run the deterministic spec suite (excludes e2e / legacy)"
@@ -38,6 +38,7 @@ run = "crystal spec --error-trace --tag legacy {{vars.SPEC_OPTS}}"
 
 [tasks."dev:snmpd"]
 description = "Run the test SNMP agent on 127.0.0.1:16161 (foreground; pair with dev:spec-e2e)"
+env = { OPENSSL_CONF = "{{config_root}}/.mise/openssl-legacy.cnf" }
 run = """
 SNMPD=$(command -v snmpd || true)
 [ -x "$SNMPD" ] || SNMPD=/opt/homebrew/opt/net-snmp/sbin/snmpd
@@ -47,8 +48,8 @@ SNMP_PERSISTENT_DIR=$(mktemp -d) exec "$SNMPD" -C -c {{config_root}}/spec/suppor
 
 [tasks."dev:spec-mt"]
 description = "Run the deterministic spec suite multi-threaded (fiber-safety gate)"
-run = "crystal spec --error-trace -Dpreview_mt --tag '~e2e' --tag '~legacy' {{vars.SPEC_OPTS}}"
-env = { CRYSTAL_WORKERS = "4" }
+run = "crystal spec --error-trace --tag '~e2e' --tag '~legacy' {{vars.SPEC_OPTS}}"
+env = { SNMP_SPEC_WORKERS = "4" }
 
 [tasks."dev:docs"]
 description = "Build the API docs (fails on doc-comment / compile errors)"
@@ -59,7 +60,7 @@ description = "Type-check the README examples (keeps the docs honest)"
 run = """
 for f in examples/*.cr; do
   echo "==> $f"
-  crystal build --no-codegen "$f"
+  crystal build --no-codegen "$f" || exit
 done
 """
 

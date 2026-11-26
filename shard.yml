@@ -5,6 +5,7 @@ crystal: ">= 1.2.0"
 dependencies:
   bindata:
     github: spider-gazelle/bindata
+    version: ">= 3.0.0"
 
 development_dependencies:
   ameba:

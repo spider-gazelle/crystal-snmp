@@ -35,12 +35,12 @@ class SNMP::Message
   property community : String
 
   {% for proxy in [:varbinds, :request_id, :error_index, :error_status, :non_repeaters, :max_repetitions] %}
-    def {{proxy.id}}
-      @pdu.{{proxy.id}}
+    def {{ proxy.id }}
+      @pdu.{{ proxy.id }}
     end
 
-    def {{proxy.id}}=(value)
-      @pdu.{{proxy.id}} = value
+    def {{ proxy.id }}=(value)
+      @pdu.{{ proxy.id }} = value
     end
   {% end %}
 
@@ -90,6 +90,6 @@ class SNMP::Message
   end
 
   def to_io(io : IO, format : IO::ByteFormat = IO::ByteFormat::SystemEndian)
-    self.to_ber.write(io)
+    to_ber.write(io)
   end
 end

@@ -2,8 +2,15 @@ class SNMP::PDU
   def initialize(ber : ASN1::BER)
     pdu = SNMP.ber_fields(ber, 4, "PDU")
     @request_id = pdu[0].get_integer.to_i32
-    @error_status = SNMP.decode_enum(ErrorStatus, pdu[1].get_integer, "error-status")
-    @error_index = pdu[2].get_integer.to_i32
+    if ber.tag_class.context_specific? && ber.tag_number == Request::GetBulk.to_u8
+      @non_repeaters = bulk_count(pdu[1], "non-repeaters")
+      @max_repetitions = bulk_count(pdu[2], "max-repetitions")
+      @error_status = ErrorStatus::NoError
+      @error_index = 0
+    else
+      @error_status = SNMP.decode_enum(ErrorStatus, pdu[1].get_integer, "error-status")
+      @error_index = pdu[2].get_integer.to_i32
+    end
     @varbinds = pdu[3].children.map do |varbind|
       VarBind.new(varbind)
     end
@@ -26,9 +33,15 @@ class SNMP::PDU
   property varbinds : Array(VarBind)
 
   # GetBulk (RFC 3416) overloads the error-status / error-index slots with
-  # non-repeaters / max-repetitions. These are only emitted for a GetBulk PDU.
+  # non-repeaters / max-repetitions.
   property non_repeaters : Int32 = 0
   property max_repetitions : Int32 = 0
+
+  private def bulk_count(ber : ASN1::BER, name : String) : Int32
+    count = ber.get_integer
+    raise SNMP::ParseError.new("GetBulk #{name} out of range: #{count}") unless 0 <= count <= Int32::MAX
+    count.to_i32
+  end
 
   def new_request_id
     @request_id = rand(REQUEST_ID_RANGE)

@@ -5,17 +5,19 @@ require "../src/snmp"
 # Connect to the agent
 socket = UDPSocket.new
 socket.connect("localhost", 161)
-socket.sync = false
 socket.read_timeout = 3.seconds
 
 # Build and send the request
 session = SNMP::Session.new(community: "public")
 request = session.get("1.3.6.1.2.1.1.4.0")
-socket.write_bytes request
-socket.flush
+socket.send(request.to_ber.to_slice)
 
 # Parse the response, verifying it answers *this* request
-response = session.parse(socket.read_bytes(ASN1::BER))
+packet, _ = socket.receive(65_507)
+ber = ASN1::BER.new
+ber.max_content_length = packet.bytesize
+ber.read(IO::Memory.new(packet))
+response = session.parse(ber)
 raise "response-id mismatch" unless response.request_id == request.request_id
 raise "agent error: #{response.error_status}" unless response.error_status.no_error?
 

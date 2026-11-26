@@ -22,7 +22,7 @@ struct SNMP::Counter32
   end
 
   def to_ber : ASN1::BER
-    application_ber(AppTags::Counter32, SNMP.set_unsigned32(@value))
+    application_ber(AppTags::Counter32, ASN1::BER.new.set_integer(@value))
   end
 end
 
@@ -34,7 +34,7 @@ struct SNMP::Gauge32
   end
 
   def to_ber : ASN1::BER
-    application_ber(AppTags::Gauge32, SNMP.set_unsigned32(@value))
+    application_ber(AppTags::Gauge32, ASN1::BER.new.set_integer(@value))
   end
 end
 
@@ -46,7 +46,7 @@ struct SNMP::TimeTicks
   end
 
   def to_ber : ASN1::BER
-    application_ber(AppTags::TimeTicks, SNMP.set_unsigned32(@value))
+    application_ber(AppTags::TimeTicks, ASN1::BER.new.set_integer(@value))
   end
 end
 
@@ -58,7 +58,7 @@ struct SNMP::Counter64
   end
 
   def to_ber : ASN1::BER
-    application_ber(AppTags::Counter64, SNMP.set_unsigned64(@value))
+    application_ber(AppTags::Counter64, ASN1::BER.new.set_integer(@value))
   end
 end
 

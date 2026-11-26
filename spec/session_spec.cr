@@ -3,7 +3,7 @@ require "./helper"
 describe SNMP::V3::Session do
   it "should know when to revalidate" do
     session = SNMP::V3::Session.new("username")
-    session.must_revalidate?.should eq(true)
+    session.must_revalidate?.should be_true
     session.engine_id.should eq("")
 
     message = session.engine_validation_probe
@@ -14,6 +14,6 @@ describe SNMP::V3::Session do
     session.validate(message)
 
     session.engine_id.should eq("000000000000000000000002")
-    session.must_revalidate?.should eq(false)
+    session.must_revalidate?.should be_false
   end
 end

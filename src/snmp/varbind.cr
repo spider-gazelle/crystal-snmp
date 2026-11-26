@@ -1,6 +1,6 @@
 class SNMP::VarBind
   def initialize(ber : ASN1::BER)
-    varbind = ber.children
+    varbind = SNMP.ber_fields(ber, 2, "varbind")
     @oid = varbind[0].get_object_id
     @value = varbind[1]
   end
@@ -20,7 +20,7 @@ class SNMP::VarBind
     when TypedValue
       data.value = value.to_ber
     when String
-      data.value.set_string(value)
+      data.value.set_string(value, tag: UniversalTags::OctetString)
     when Int
       data.value.set_integer(value)
     when Bool
@@ -52,12 +52,12 @@ class SNMP::VarBind
   end
 
   {% for helpers in [:unsigned64, :unsigned32] %}
-    def get_{{helpers.id}}
-      SNMP.get_{{helpers.id}}(self.value)
+    def get_{{ helpers.id }}
+      SNMP.get_{{ helpers.id }}(self.value)
     end
 
-    def set_{{helpers.id}}(data)
-      SNMP.set_{{helpers.id}}(data, self.value)
+    def set_{{ helpers.id }}(data)
+      SNMP.set_{{ helpers.id }}(data, self.value)
       self
     end
   {% end %}

@@ -15,7 +15,7 @@ module SNMP::V3
     # Map a reported OID (with or without its trailing `.0` instance) to the
     # counter, or nil if it is not under the usmStats subtree.
     def self.from_oid?(oid : String) : UsmStat?
-      return nil unless oid.starts_with?("#{USM_STATS_BASE}.")
+      return unless oid.starts_with?("#{USM_STATS_BASE}.")
       arc = oid[(USM_STATS_BASE.size + 1)..].split('.', 2).first
       num = arc.to_i?
       num ? from_value?(num) : nil

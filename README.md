@@ -103,17 +103,19 @@ require "snmp"
 # Connect to the agent
 socket = UDPSocket.new
 socket.connect("localhost", 161)
-socket.sync = false
 socket.read_timeout = 3.seconds
 
 # Build and send the request
 session = SNMP::Session.new(community: "public")
 request = session.get("1.3.6.1.2.1.1.4.0")
-socket.write_bytes request
-socket.flush
+socket.send(request.to_ber.to_slice)
 
 # Parse the response, verifying it answers *this* request
-response = session.parse(socket.read_bytes(ASN1::BER))
+packet, _ = socket.receive(65_507)
+ber = ASN1::BER.new
+ber.max_content_length = packet.bytesize
+ber.read(IO::Memory.new(packet))
+response = session.parse(ber)
 raise "response-id mismatch" unless response.request_id == request.request_id
 raise "agent error: #{response.error_status}" unless response.error_status.no_error?
 
@@ -129,8 +131,15 @@ require "snmp"
 # Connect to the agent
 socket = UDPSocket.new
 socket.connect("localhost", 161)
-socket.sync = false
 socket.read_timeout = 3.seconds
+
+receive_message = -> do
+  packet, _ = socket.receive(65_507)
+  ber = ASN1::BER.new
+  ber.max_content_length = packet.bytesize
+  ber.read(IO::Memory.new(packet))
+  ber
+end
 
 # Session with authentication and privacy (see AuthProtocol / PrivacyProtocol
 # for the supported algorithms, incl. SHA-2 and AES-256)
@@ -142,19 +151,17 @@ session = SNMP::V3::Session.new(
 # Discover the engine id / boots / time (required before authenticated requests;
 # also drives periodic revalidation of the RFC 3414 time window)
 if session.must_revalidate?
-  socket.write_bytes session.engine_validation_probe
-  socket.flush
-  session.validate socket.read_bytes(ASN1::BER)
+  socket.send(session.engine_validation_probe.to_ber.to_slice)
+  session.validate receive_message.call
 end
 
 # Build the request, then prepare it (encrypt + sign) for transmission
 request = session.get("1.3.6.1.2.1.1.4.0")
-socket.write_bytes session.prepare(request)
-socket.flush
+socket.send(session.prepare(request).to_slice)
 
 # Parse the response: the HMAC is verified and the time window enforced.
 # Still check that it answers *this* request before trusting the values.
-response = session.parse(socket.read_bytes(ASN1::BER))
+response = session.parse(receive_message.call)
 raise "response-id mismatch" unless response.request_id == request.request_id
 raise "agent error: #{response.error_status}" unless response.error_status.no_error?
 
@@ -207,26 +214,10 @@ Everything the library raises inherits `SNMP::Error`: `SNMP::ParseError`
 
 ## Notes on IO
 
-### Writing to sockets
-
-When writing SNMP messages to a socket yourself, buffer the write:
-
-```crystal
-socket.sync = false          # buffer…
-socket.write_bytes message   # …the message construction writes…
-socket.flush                 # …and send one datagram
-```
-
-`to_io` writes the message progressively; without buffering each write would
-be sent as its own packet and most SNMP agents will not accept fragmented
-messages. (`SNMP::Client` handles this for you.)
-
-### Reading from sockets
-
-Whilst you'll probably be OK reading data like `socket.read_bytes(ASN1::BER)`
-you should probably be buffering requests based on SNMP PDU max size
-(defaulting to 65507 bytes) and throwing away any buffered data that can't be
-read after buffering or a short timeout.
+SNMP over UDP carries one message per datagram. When managing the socket yourself,
+serialize the complete BER message before sending it and receive the reply as
+a datagram. The raw examples use a 65,507-byte IPv4 UDP receive limit and cap
+BER content lengths at the size of the received datagram.
 
 ## Development
 
