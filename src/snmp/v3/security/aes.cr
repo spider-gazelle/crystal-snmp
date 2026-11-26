@@ -15,18 +15,9 @@ class SNMP::V3::Security::AES
     iv, salt = generate_encryption_key(engine_boots, engine_time)
 
     cipher.encrypt
+    cipher.padding = false
     cipher.iv = iv
     cipher.key = aes_key
-
-    if (diff = decrypted_data.bytesize % 8) != 0
-      io = IO::Memory.new
-      io.write decrypted_data
-      # Pad with 0's
-      (0...(8 - diff)).each do
-        io.write_byte 0u8
-      end
-      decrypted_data = io.to_slice
-    end
 
     encrypted_data = IO::Memory.new
     encrypted_data.write(cipher.update(decrypted_data))

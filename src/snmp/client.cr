@@ -237,8 +237,10 @@ class SNMP::Client
 
   protected def check_validation_probe(sock)
     if session.must_revalidate?
-      sock.send(session.engine_validation_probe.to_ber.to_slice)
-      session.validate read_datagram(sock)
+      probe = session.engine_validation_probe
+      sock.send(probe.to_ber.to_slice)
+      response = receive_response(sock, probe) { |ber| session.parse(ber, nil) }
+      session.validate(response.as(V3::Message))
     end
   end
 
@@ -272,7 +274,46 @@ class SNMP::Client
   private def transceive(sock, message : SNMP::Message) : SNMP::Message
     payload = message.is_a?(SNMP::V3::Message) ? session.prepare(message) : message.to_ber
     sock.send(payload.to_slice)
-    session.parse(read_datagram(sock))
+    receive_response(sock, message) { |ber| session.parse(ber) }
+  end
+
+  private def receive_response(sock : UDPSocket, request : SNMP::Message, &) : SNMP::Message
+    read_timeout = sock.read_timeout
+    deadline = Time.instant + read_timeout if read_timeout
+
+    loop do
+      ber = read_datagram(sock)
+      # Match before parsing so a stale v3 message cannot affect session timeliness.
+      if !request.is_a?(V3::Message) || matching_message_id?(ber, request)
+        response = yield ber
+        # Reports correlate by msgID. Their scoped request-id can be zero.
+        return response if response.is_a?(V3::Message) && response.report?
+        return response if matching_response?(response, request)
+      end
+
+      if deadline
+        remaining = deadline - Time.instant
+        raise IO::TimeoutError.new("Read timed out") if remaining <= Time::Span.zero
+        sock.read_timeout = remaining
+      end
+    end
+  ensure
+    sock.read_timeout = read_timeout
+  end
+
+  private def matching_message_id?(ber : ASN1::BER, request : V3::Message) : Bool
+    fields = SNMP.ber_fields(ber, 2, "SNMP message")
+    return true unless fields[0].get_integer == Version::V3.value
+
+    header = SNMP.ber_fields(fields[1], 1, "v3 header")
+    header[0].get_integer == request.id
+  end
+
+  private def matching_response?(response : SNMP::Message, request : SNMP::Message) : Bool
+    return false unless response.request.response? && response.request_id == request.request_id
+    return false unless response.version == request.version
+
+    request.is_a?(V3::Message) || response.community == request.community
   end
 
   private def read_datagram(sock : UDPSocket) : ASN1::BER

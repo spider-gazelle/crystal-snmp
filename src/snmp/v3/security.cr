@@ -43,7 +43,7 @@ class SNMP::V3::Security
     AES256
   end
 
-  property engine_id : String
+  getter engine_id : String
   getter username : String
   getter security_level : MessageFlags
   getter auth_protocol : AuthProtocol
@@ -93,6 +93,16 @@ class SNMP::V3::Security
   # This class implements the User-based Security Model.
   def security_model : SecurityModel
     SecurityModel::USM
+  end
+
+  def engine_id=(engine_id : String) : String
+    return engine_id if @engine_id == engine_id
+
+    @engine_id = engine_id
+    @auth_key = Bytes.new(0)
+    @priv_key = Bytes.new(0)
+    @encryption = nil
+    engine_id
   end
 
   def encode(pdu : ASN1::BER, engine_time, engine_boots)

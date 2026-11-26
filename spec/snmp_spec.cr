@@ -234,13 +234,14 @@ describe SNMP do
     session = SNMP::V3::Session.new(security).validate(snmp)
 
     # Test serialisation
+    scoped_pdu_size = snmp.scoped_pdu.to_ber.to_slice.size
     io = IO::Memory.new
     io.write_bytes session.prepare(snmp)
-    io.to_slice.hexstring.size.should eq(data.size)
 
-    # Test decoding of serialised message
+    # The captured message had padding. AES-CFB emits one byte per plaintext byte.
     io.rewind
     test = io.read_bytes(ASN1::BER)
+    test.children.last.get_bytes.size.should eq(scoped_pdu_size)
     snmp = SNMP::V3::Message.new(test.children, security)
     snmp.varbinds[0].value.get_object_id.should eq("1.3.6.1.4.1.8072.3.2.10")
   end
